@@ -2,7 +2,7 @@ import abc
 import ast
 import operator
 import itertools
-from stencil_compiler import StencilCompiler
+from stencil_compiler import StencilCompiler, NameFinder
 from vector import Vector
 
 __author__ = 'nzhang-dev'
@@ -14,6 +14,10 @@ __author__ = 'nzhang-dev'
 
 class Stencil(object):
 
+    @staticmethod
+    def _compile_to_ast(node, index_name):
+        return StencilCompiler(index_name).visit(node)
+
     def __init__(self, op_tree):
         self.op_tree = op_tree
 
@@ -22,11 +26,41 @@ class Stencil(object):
         return {node.name for node in ast.walk(self.op_tree) if hasattr(node, "name")}
 
     def compile_to_ast(self):
-        return self._compile_to_ast(self.op_tree)
+        index_name = 'index'
+        nodes = self._compile_to_ast(self.op_tree, index_name=index_name)
+        if not isinstance(nodes, (list, tuple)):
+            nodes = [nodes]
+        nodes[-1] = ast.Return(nodes[-1])
 
-    @staticmethod
-    def _compile_to_ast(node):
-        return StencilCompiler().visit(node)
+        array_names = NameFinder.get_names(self.op_tree)
+
+        function_name = 'kernel'
+        args = [
+            index_name,
+        ]
+        args.extend(sorted(array_names))
+        return ast.FunctionDef(
+            name=function_name,
+            args=ast.arguments(
+                args=[ast.Name(id=arg, ctx=ast.Param()) for arg in args],
+                vararg=None,
+                kwarg=None,
+                defaults=[]
+            ),
+            body=nodes,
+            decorator_list=[]
+        )
+
+    def _get_callable(self):
+        tree = self.compile_to_ast()
+        tree = ast.Module(body=[tree])
+        tree = ast.fix_missing_locations(tree)
+        code = compile(tree, '<string>', 'exec')
+        exec code in globals(), locals()
+        return locals()['kernel']
+
+
+
 
 
 class StencilNode(ast.AST):

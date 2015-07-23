@@ -38,7 +38,8 @@ class StencilCompiler(ast.NodeVisitor):
                                 ctx=ast.Load()
                             )
                         )
-                    )
+                    ),
+                    ctx=ast.Load()
                 ),
                 op=ast.Mult(),
                 right=weight
@@ -56,3 +57,16 @@ class StencilCompiler(ast.NodeVisitor):
         return ast.BinOp(left=left, op=op, right=right)
 
 
+class NameFinder(ast.NodeVisitor):
+    def __init__(self, names=None):
+        self.names = names if names is not None else set()
+
+    def visit_StencilComponent(self, node):
+        self.names.add(node.name)
+        self.generic_visit(node)
+
+    @classmethod
+    def get_names(cls, node):
+        finder = cls()
+        finder.visit(node)
+        return finder.names
