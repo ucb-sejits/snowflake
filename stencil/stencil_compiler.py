@@ -57,16 +57,12 @@ class StencilCompiler(ast.NodeVisitor):
         return ast.BinOp(left=left, op=op, right=right)
 
 
-class NameFinder(ast.NodeVisitor):
-    def __init__(self, names=None):
-        self.names = names if names is not None else set()
-
-    def visit_StencilComponent(self, node):
-        self.names.add(node.name)
-        self.generic_visit(node)
-
-    @classmethod
-    def get_names(cls, node):
-        finder = cls()
-        finder.visit(node)
-        return finder.names
+def find_names(node):
+    names = set()
+    # if hasattr(node, 'name'):
+    #     names.add(node.name)
+    for n in ast.walk(node):
+        #print(type(n))
+        if hasattr(n, 'name'):
+            names.add(n.name)
+    return names
