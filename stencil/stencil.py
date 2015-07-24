@@ -3,7 +3,7 @@ import ast
 from collections import Iterable
 import operator
 import itertools
-from stencil_compiler import StencilCompiler, find_names
+from _compiler import StencilCompiler, find_names
 from vector import Vector
 import numpy as np
 
@@ -144,17 +144,13 @@ class WeightArray(StencilNode):
     _fields = ['weights']
 
     @property
-    def radius(self):
-        return self.shape / 2
-
-    @property
     def indices(self):
         ranges = [range(i) for i in self.shape]
         return (Vector(coords) for coords in itertools.product(*ranges))
 
     @property
     def center(self):
-        return self.radius
+        return self.shape / 2
 
     @property
     def vectors(self):
