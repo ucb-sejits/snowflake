@@ -1,6 +1,7 @@
 import ast
 import functools
 import operator
+from stencil import WeightArray, StencilComponent, StencilConstant, SparseWeightArray
 
 __author__ = 'nzhang-dev'
 
@@ -16,6 +17,9 @@ class StencilCompiler(ast.NodeVisitor):
 
     def __init__(self, index_name='index'):
         self.index_name = index_name
+
+    def visit_Stencil(self, node):
+        return self.visit(node.op_tree)
 
     def visit_StencilConstant(self, node):
         return ast.Num(n=node.value, ctx=ast.Load())
@@ -44,7 +48,7 @@ class StencilCompiler(ast.NodeVisitor):
                 op=ast.Mult(),
                 right=weight
             ) for weight, vector in zip(weights, node.weights.vectors)
-            if not hasattr(weight, 'value') or weight.value != 0
+            if not (isinstance(weight, StencilConstant) and weight.value == 0)
         ]
         if not components:  # we filtered all of it out
             return ast.Num(n=0)
@@ -65,8 +69,7 @@ class DependencyAnalyzer(ast.NodeVisitor):
         dependencies = self.generic_visit(node)
         name = node.name
         node_dependencies = (vector for vector, index in zip(node.vectors, node.indices)
-                             if not (hasattr(node[index], 'value') and node[index].value == 0))
-
+                             if not (isinstance(node, StencilConstant) and node[index].value == 0))
 
 
 def find_names(node):
@@ -74,7 +77,7 @@ def find_names(node):
     # if hasattr(node, 'name'):
     #     names.add(node.name)
     for n in ast.walk(node):
-        #print(type(n))
-        if hasattr(n, 'name'):
+        if isinstance(n, StencilComponent):
+            #print("found")
             names.add(n.name)
     return names

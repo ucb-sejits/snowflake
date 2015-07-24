@@ -3,7 +3,6 @@ import ast
 from collections import Iterable
 import operator
 import itertools
-from _compiler import StencilCompiler, find_names
 from vector import Vector
 import numpy as np
 
@@ -13,69 +12,22 @@ __author__ = 'nzhang-dev'
 # A component is defined by a weight array, which may or may not recursively contain components.
 ###############################################################################################################
 
+class StencilNode(ast.AST):
+    pass
 
-class Stencil(object):
+class Stencil(StencilNode):
 
-    @staticmethod
-    def _compile_to_ast(node, index_name):
-        return StencilCompiler(index_name).visit(node)
+    _fields = ["op_tree"]
 
     def __init__(self, op_tree):
         self.op_tree = op_tree
 
-    @property
-    def names(self):
-        return {node.name for node in ast.walk(self.op_tree) if hasattr(node, "name")}
-
-    def compile_to_ast(self, index_name):
-        nodes = self._compile_to_ast(self.op_tree, index_name=index_name)
-        if not isinstance(nodes, (list, tuple)):
-            nodes = [nodes]
-        return nodes
-
-    def get_kernel(self):
-        index_name = 'index'
-        nodes = self.compile_to_ast(index_name)
-        nodes[-1] = ast.Return(nodes[-1])
-
-        array_names = find_names(self.op_tree)
-
-        function_name = 'kernel'
-        args = [
-            index_name,
-        ]
-        args.extend(sorted(array_names))
-        tree = ast.FunctionDef(
-            name=function_name,
-            args=ast.arguments(
-                args=[ast.Name(id=arg, ctx=ast.Param()) for arg in args],
-                vararg=None,
-                kwarg=None,
-                defaults=[]
-            ),
-            body=nodes,
-            decorator_list=[]
-        )
-        tree = ast.Module(body=[tree])
-        tree = ast.fix_missing_locations(tree)
-        code = compile(tree, '<string>', 'exec')
-        exec code in globals(), locals()
-        return locals()['kernel']
-
-
-
-
-
-class StencilNode(ast.AST):
-    pass
-
 
 class StencilComponent(StencilNode):
-    _fields = ["weights"]
+    _fields = ["name", "weights"]
 
     def __init__(self, name, weights):
         self.name = name
-        assert isinstance(weights, WeightArray)
         self.weights = weights
 
     def __add__(self, other):
@@ -103,6 +55,8 @@ class StencilComponent(StencilNode):
 
 
 class StencilConstant(StencilNode):
+
+    _fields = ['value']
 
     def __init__(self, value):
         # while isinstance(value, StencilConstant):
@@ -167,25 +121,25 @@ class WeightArray(StencilNode):
         return Vector(self._get_shape(self.data))
 
     @classmethod
-    def componentize(cls, arr):
+    def __componentize(cls, arr):
         if not isinstance(arr[0], Iterable):
             return [
                 el if isinstance(el, StencilComponent) else StencilConstant(el) for el in arr
             ]
-        return [cls.componentize(sub_array) for sub_array in arr]
+        return [cls.__componentize(sub_array) for sub_array in arr]
 
     @classmethod
-    def flatten(cls, arr):
+    def _flatten(cls, arr):
         if not isinstance(arr[0], Iterable):
             return arr
-        return tuple(itertools.chain.from_iterable(cls.flatten(a) for a in arr))
+        return tuple(itertools.chain.from_iterable(cls._flatten(a) for a in arr))
 
     def __init__(self, data):
-        self.data = self.componentize(data)
+        self.data = self.__componentize(data)
 
     @property
     def weights(self):
-        return list(self.flatten(self.data))
+        return list(self._flatten(self.data))
 
     def __getitem__(self, item):
         if isinstance(item, Iterable):
@@ -202,6 +156,46 @@ class WeightArray(StencilNode):
                 obj = obj[s]
             obj[key[-1]] = value
         self.data[key] = value
+
+
+class SparseWeightArray(StencilNode):
+    _fields = ['weights']
+
+    def __init__(self, weight_map):
+        """
+        :param data_list: a dict of point: values
+        :return:
+        """
+        self.__weight_map = {}
+        for coord, value in weight_map.items():
+            self.__weight_map[Vector(coord)] = value if isinstance(value, StencilNode) else StencilConstant(value)
+        #self.__weight_map = weight_map
+        self.__key_value_pairs = tuple(self.__weight_map.items())
+        self.__ndim = len(self.__key_value_pairs[0][0])
+
+    @property
+    def weights(self):
+        return [value for key, value in self.__key_value_pairs]
+
+    @property
+    def indices(self):
+        return [key for key, value in self.__key_value_pairs]
+
+    @property
+    def vectors(self):
+        return [key for key, value in self.__key_value_pairs]
+
+    @property
+    def center(self):
+        return Vector((0,) * self.__ndim)
+
+    def __getitem__(self, item):
+        return self.__weight_map[item]
+
+    def __setitem__(self, key, value):
+        self.__weight_map[key] = value
+
+
 
 class StencilOp(StencilNode):
     _fields = ['left', 'right']
