@@ -50,9 +50,9 @@ class IterationSpace(StencilCompilerNode):
         new_space = []
         for dim_range in space:
             if len(dim_range) == 1:
-                dim_range = (0, dim_range[0], 1)
+                dim_range = (0, dim_range[0], None)
             elif len(dim_range) == 2:
-                dim_range = (dim_range[0], dim_range[1], 1)
+                dim_range = (dim_range[0], dim_range[1], None)
             elif len(dim_range) == 3:
                 dim_range = tuple(dim_range)
             else:
@@ -62,7 +62,6 @@ class IterationSpace(StencilCompilerNode):
         self.body = body
 
     def __deepcopy__(self, memo):
-        print("ITERATION SPACE")
         return type(self)(
             copy.deepcopy(self.space, memo=memo),
             copy.deepcopy(self.body, memo=memo)
