@@ -1,12 +1,9 @@
-import abc
 import ast
-from collections import Iterable, namedtuple
+from collections import Iterable
 import copy
 import operator
 import itertools
 from vector import Vector
-import numpy as np
-from collections import defaultdict
 
 __author__ = 'nzhang-dev'
 class StencilNode(ast.AST):

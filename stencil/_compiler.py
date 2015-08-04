@@ -3,7 +3,7 @@ import functools
 import operator
 
 from compiler_nodes import ArrayIndex, IndexOp, IterationSpace
-from stencil import StencilComponent, StencilConstant
+from nodes import StencilComponent, StencilConstant
 from nodes import Stencil
 
 
@@ -176,11 +176,19 @@ def find_names(node):
     target = None
     # if hasattr(node, 'name'):
     #     names.add(node.name)
-    for n in ast.walk(node):
-        if isinstance(n, StencilComponent):
-            #print("found")
-            names.add(n.name)
-        elif isinstance(n, Stencil):
-            names.add(n.output)
+    class Visitor(ast.NodeVisitor):
+        def visit_StencilComponent(self, node):
+            names.add(node.name)
+            self.generic_visit(node)
+        def visit_Stencil(self, node):
+            names.add(node.output)
+            self.generic_visit(node)
+    # for n in ast.walk(node):
+    #     if isinstance(n, StencilComponent):
+    #         #print("found")
+    #         names.add(n.name)
+    #     elif isinstance(n, Stencil):
+    #         names.add(n.output)
+    Visitor().visit(node)
     return names
 

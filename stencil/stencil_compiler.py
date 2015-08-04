@@ -14,7 +14,7 @@ import math
 from ctree.types import get_ctype
 from rebox.specializers.order import Ordering
 from _compiler import StencilCompiler, find_names, ArrayOpRecognizer, OpSimplifier
-from nodes import WeightArray
+from nodes import WeightArray, SparseWeightArray
 
 import numpy as np
 
@@ -26,8 +26,17 @@ class Compiler(object):
 
     @staticmethod
     def get_ndim(node):
-        weight_array = next(n for n in ast.walk(node) if isinstance(n, WeightArray))
-        return len(weight_array.center)
+        class Visitor(ast.NodeVisitor):
+            def __init__(self):
+                self.ndim = 0
+            def visit_WeightArray(self, node):
+                self.ndim = len(node.center)
+            def visit_SparseWeightArray(self, node):
+                self.visit_WeightArray(node)
+
+        v = Visitor()
+        v.visit(node)
+        return v.ndim
 
     def __init__(self, index_name="index"):
         self.index_name = index_name
