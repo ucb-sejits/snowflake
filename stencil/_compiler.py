@@ -130,7 +130,7 @@ class OpSimplifier(ast.NodeTransformer):
         patterns = cls.rules.get(type(op), {}).items()
         for pattern, result in patterns:
             if cls.__matches(left, right, pattern):
-                print("simplified")
+                #print("simplified")
                 return cls.__apply_result(left, right, result)
 
         return node

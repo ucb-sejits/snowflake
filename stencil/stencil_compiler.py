@@ -177,6 +177,10 @@ class PythonCompiler(Compiler):
 
 class CCompiler(Compiler):
 
+    def __init__(self, *args):
+        super(CCompiler, self).__init__(*args)
+        self._lsk = None
+
     class IndexOpToEncode(ast.NodeTransformer):
         def visit_IndexOp(self, node):
             return ast.Call(
@@ -234,15 +238,23 @@ class CCompiler(Compiler):
             self.target_name = target_name
             self.index_name = index_name
 
+        @property
+        def arg_spec(self):
+            return [self.target_name] + list(sorted(self.names - {self.target_name}))
+
+        class Subconfig(OrderedDict):
+            def __hash__(self):
+                return hash(tuple((name, arg.shape) for name, arg in self.items()))
+
         def args_to_subconfig(self, args):
-            names_to_use = [self.target_name] + list(sorted(self.names - {self.target_name}))
-            subconf = OrderedDict()
+            names_to_use = self.arg_spec
+            subconf = self.Subconfig()
             for name, arg in zip(names_to_use, args):
                 subconf[name] = arg
             return subconf
 
         def transform(self, tree, program_config):
-
+            # print("NEW FILE")
             subconfig, tuning_config = program_config
             CCompiler.IndexOpToEncode().visit(tree)
             ndim = subconfig[self.target_name].ndim
@@ -267,8 +279,6 @@ class CCompiler(Compiler):
 
 
         def finalize(self, transform_result, program_config):
-            for f in transform_result:
-                print f
             proj = Project(files=transform_result)
             fn = CCompiler.ConcreteSpecializedKernel()
             func_types = [
@@ -283,13 +293,13 @@ class CCompiler(Compiler):
                 )
             )
 
-
-
     def _post_process(self, original, compiled, index_name, **kwargs):
-        lsk = self.LazySpecializedKernel(
-            py_ast=self.IndexOpToEncode().visit(compiled),
+        py_ast = self.IndexOpToEncode().visit(compiled)
+        ast.fix_missing_locations(py_ast)
+        # print("NEW KERNEL")
+        return self.LazySpecializedKernel(
+            py_ast=py_ast,
             names=find_names(original),
             index_name=index_name,
             target_name=original.output
         )
-        return lsk
