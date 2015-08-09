@@ -259,3 +259,8 @@ class RangeNode(StencilNode):
 
     def __deepcopy__(self, memo):
         return RangeNode(self.target, self.iterator, copy.deepcopy(self.body))
+
+class StencilBlock(StencilNode):
+    _fields = ['body']
+    def __init__(self, body):
+        self.body = body

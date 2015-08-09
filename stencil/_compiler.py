@@ -23,6 +23,9 @@ class StencilCompiler(ast.NodeVisitor):
         self.index_name = index_name
         self.ndim = ndim
 
+    def visit_StencilBlock(self, node):
+        return [self.visit(i) for i in node.body]
+
     def visit_Stencil(self, node):
         body = self.visit(node.op_tree)
         assignment = ast.Assign(

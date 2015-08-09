@@ -91,7 +91,7 @@ class PythonCompiler(Compiler):
 
         def get_range_args(self, iter_range, dim):
             range_info = [
-                ast.Num(n=iter_range[i]) if iter_range[i] >= 0 else
+                ast.Num(n=iter_range[0]) if iter_range[0] >= 0 else
                 ast.BinOp(
                     left=ast.Subscript(
                         value=ast.Attribute(
@@ -102,10 +102,24 @@ class PythonCompiler(Compiler):
                         slice=ast.Index(value=ast.Num(n=dim)),
                         ctx=ast.Load()
                     ),
-                    right=ast.Num(n=-iter_range[i]),
+                    right=ast.Num(n=-iter_range[0]),
                     op=ast.Sub()
                 )
-                for i in range(2)
+            ] + [
+                ast.Num(n=iter_range[1]) if iter_range[1] > 0 else
+                ast.BinOp(
+                    left=ast.Subscript(
+                        value=ast.Attribute(
+                            value=ast.Name(id=self.reference_array_name, ctx=ast.Load()),
+                            attr='shape',
+                            ctx=ast.Load()
+                        ),
+                        slice=ast.Index(value=ast.Num(n=dim)),
+                        ctx=ast.Load()
+                    ),
+                    right=ast.Num(n=-iter_range[1]),
+                    op=ast.Sub()
+                )
             ]
             if iter_range.stride is not None:
                 stride = iter_range.stride
@@ -205,7 +219,7 @@ class CCompiler(Compiler):
             node = self.generic_visit(node)
             inside = node.body
             make_low = lambda low, dim: Constant(low) if low >= 0 else Constant(self.reference_array_shape[dim] + low)
-            make_high = lambda high, dim: Constant(high) if high >= 0 else Constant(self.reference_array_shape[dim] + high)
+            make_high = lambda high, dim: Constant(high) if high > 0 else Constant(self.reference_array_shape[dim] + high)
             for dim, iteration_range in reversed(list(enumerate(node.space))):
 
                 inside = [
