@@ -6,10 +6,16 @@ __author__ = 'nzhang-dev'
 import ast
 
 class StencilCompilerNode(ast.AST):
+    """
+    Generic Parent class or Stencil Nodes
+    """
     pass
 
 
 class IndexOp(StencilCompilerNode):
+    """
+    Operation on an index
+    """
     _fields = ['elts', 'ndim', 'name']
     def __init__(self, elts):
         self.elts = elts
@@ -32,6 +38,9 @@ class IndexOp(StencilCompilerNode):
 
 
 class ArrayIndex(IndexOp):
+    """
+    Semantic node for an array
+    """
     def __init__(self, name, ndim):
         super(ArrayIndex, self).__init__(
             elts=[
@@ -42,6 +51,9 @@ class ArrayIndex(IndexOp):
 
 
 class IterationSpace(StencilCompilerNode):
+    """
+    Semantic node for the space over which a stencil is applied.
+    """
     _fields = ['space', 'body']
 
     Dimension = namedtuple("Dimension", ['low', 'high', 'stride'])

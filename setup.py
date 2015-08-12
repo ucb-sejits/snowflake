@@ -16,6 +16,7 @@ setup(
     install_requires=[
         'numpy',
         'ctree',
-        'rebox'
+        'rebox',
+        'sphinx'
     ]
 )

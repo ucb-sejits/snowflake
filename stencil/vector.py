@@ -8,6 +8,9 @@ __author__ = 'nzhang-dev'
 
 
 class Vector(tuple):
+    """
+    A Vector that supports arithmetic. These can be used for numpy indicies and has neighborhood utility functions.
+    """
     @classmethod
     def unit_vector(cls, dim, ndim):
         vec = [0 for i in range(ndim)]
@@ -20,6 +23,12 @@ class Vector(tuple):
 
     @classmethod
     def von_neumann_vectors(cls, ndim, radius=1, closed=False):
+        """
+        :param ndim: Number of dimensions
+        :param radius: Von Neumann Neighborhood radius
+        :param closed: Should the neighborhood include all points r < radius or only r = radius
+        :return: Iterator of vectors in the Von Neumann neighborhood, :math:`\{v | v \in Z^n, ||v||_\infty = r\}`
+        """
         neighborhood = (cls(i) for i in partition(radius, ndim))
         if closed and radius > 1:
             return itertools.chain(neighborhood, cls.von_neumann_vectors(ndim, radius-1, closed))
@@ -27,6 +36,12 @@ class Vector(tuple):
 
     @classmethod
     def moore_vectors(cls, ndim, radius=1, closed=False):
+        """
+        :param ndim: Number of dimensions
+        :param radius: Moore Neighborhood radius
+        :param closed: Should the neighborhood include all points r < radius or only r = radius
+        :return: Iterator of vectors in the Moore neighborhood, :math:`\{v | v \in Z^n, ||v||_1 = r\}`
+        """
         neighborhood = (cls(i) for i in shell(radius, ndim))
         if closed and radius > 1:
             return itertools.chain(neighborhood, cls.moore_vectors(ndim, radius-1, closed))

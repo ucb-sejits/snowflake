@@ -11,8 +11,11 @@ class StencilNode(ast.AST):
 
 
 class Stencil(StencilNode):
+    """
+    A Stencil is defined by it's operation tree (stencil components or other things), where it outputs, and the space it iterates over
+    """
 
-    _fields = ["op_tree", "output", "iteration_space", "total_shape"]
+    _fields = ["op_tree", "output", "iteration_space"]
 
     def __init__(self, op_tree, output, iteration_space):
         # iteration_space is an iterable of (low, high, stride), (low, high), or (high,) tuples
@@ -23,6 +26,10 @@ class Stencil(StencilNode):
 
 
 class StencilComponent(StencilNode):
+    """
+    A StencilComponent consists of an array name (string) and its associated array of weights (py:func:`weightArray`).
+    Array references are assumed to be unique if their string names are unique.
+    """
     _fields = ["name", "weights"]
 
     def __init__(self, name, weights):
@@ -62,7 +69,9 @@ class StencilComponent(StencilNode):
 
 
 class StencilConstant(StencilNode):
-
+    """
+    A normal number/constant.
+    """
     _fields = ['value']
 
     def __init__(self, value):
@@ -102,6 +111,9 @@ class StencilConstant(StencilNode):
 
 
 class WeightArray(StencilNode):
+    """
+    An array of weights, denoted by either numpy matrices or normal nested lists in python. These can be constants or stencilcomponents.
+    """
     _fields = ['weights']
 
     @property
@@ -166,6 +178,9 @@ class WeightArray(StencilNode):
 
 
 class SparseWeightArray(StencilNode):
+    """
+    A weight array that's instead defined by a dictionary of vectors relative to the center with their associated values.
+    """
     _fields = ['weights']
 
     def __init__(self, weight_map):
@@ -204,6 +219,9 @@ class SparseWeightArray(StencilNode):
 
 
 class StencilOp(StencilNode):
+    """
+    An operation between stencil nodes. Will also be created as the result of mathematical operations on StencilComponents
+    """
     _fields = ['left', 'right']
 
     _op_map = {
