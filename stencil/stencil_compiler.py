@@ -258,7 +258,7 @@ class CCompiler(Compiler):
 
         class Subconfig(OrderedDict):
             def __hash__(self):
-                return hash(tuple((name, arg.shape) for name, arg in self.items()))
+                return hash(tuple((name, arg.shape) for name, arg in sorted(self.items())))
 
         def args_to_subconfig(self, args):
             names_to_use = self.arg_spec

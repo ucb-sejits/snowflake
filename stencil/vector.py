@@ -11,6 +11,7 @@ class Vector(tuple):
     """
     A Vector that supports arithmetic. These can be used for numpy indicies and has neighborhood utility functions.
     """
+
     @classmethod
     def unit_vector(cls, dim, ndim):
         vec = [0 for i in range(ndim)]
@@ -58,11 +59,27 @@ class Vector(tuple):
     def __add__(self, other):
         return Vector.__apply(self, other, operator.add)
 
+    __radd__ = __add__
+
     def __sub__(self, other):
         return Vector.__apply(self, other, operator.sub)
+
+    def __rsub__(self, other):
+        return Vector.apply(other, self, operator.sub)
 
     def __mul__(self, other):
         return Vector.__apply(self, other, operator.mul)
 
+    __rmul__ = __mul__
+
     def __div__(self, other):
         return Vector.__apply(self, other, operator.div)
+
+    def __rdiv__(self, other):
+        return Vector.apply(other, self, operator.div)
+
+    def __neg__(self):
+        return -1 * self
+
+    def __pos__(self):
+        return self

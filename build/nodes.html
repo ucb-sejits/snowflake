@@ -1,0 +1,131 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>&lt;no title&gt; &mdash; stencil 0.1 documentation</title>
+    
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="top" title="stencil 0.1 documentation" href="index.html" />
+    <link rel="prev" title="Welcome to stencil’s documentation!" href="index.html" />
+   
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+
+  </head>
+  <body role="document">  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <p>Contents:</p>
+<div class="toctree-wrapper compound" id="nodes">
+<ul class="simple">
+</ul>
+</div>
+<span class="target" id="module-stencil.nodes"></span><dl class="class">
+<dt id="stencil.nodes.Stencil">
+<em class="property">class </em><code class="descclassname">stencil.nodes.</code><code class="descname">Stencil</code><span class="sig-paren">(</span><em>op_tree</em>, <em>output</em>, <em>iteration_space</em><span class="sig-paren">)</span><a class="headerlink" href="#stencil.nodes.Stencil" title="Permalink to this definition">¶</a></dt>
+<dd><p>A Stencil is defined by it&#8217;s operation tree (stencil components or other things), where it outputs, and the space it iterates over</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="stencil.nodes.StencilComponent">
+<em class="property">class </em><code class="descclassname">stencil.nodes.</code><code class="descname">StencilComponent</code><span class="sig-paren">(</span><em>name</em>, <em>weights</em><span class="sig-paren">)</span><a class="headerlink" href="#stencil.nodes.StencilComponent" title="Permalink to this definition">¶</a></dt>
+<dd><p>A StencilComponent consists of an array name (string) and its associated array of weights (py:func:<cite>weightArray</cite>).
+Array references are assumed to be unique if their string names are unique.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="stencil.nodes.WeightArray">
+<em class="property">class </em><code class="descclassname">stencil.nodes.</code><code class="descname">WeightArray</code><span class="sig-paren">(</span><em>data</em><span class="sig-paren">)</span><a class="headerlink" href="#stencil.nodes.WeightArray" title="Permalink to this definition">¶</a></dt>
+<dd><p>An array of weights, denoted by either numpy matrices or normal nested lists in python. These can be constants or stencilcomponents.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="stencil.nodes.SparseWeightArray">
+<em class="property">class </em><code class="descclassname">stencil.nodes.</code><code class="descname">SparseWeightArray</code><span class="sig-paren">(</span><em>weight_map</em><span class="sig-paren">)</span><a class="headerlink" href="#stencil.nodes.SparseWeightArray" title="Permalink to this definition">¶</a></dt>
+<dd><p>A weight array that&#8217;s instead defined by a dictionary of vectors relative to the center with their associated values.</p>
+</dd></dl>
+
+<dl class="class">
+<dt id="stencil.nodes.StencilOp">
+<em class="property">class </em><code class="descclassname">stencil.nodes.</code><code class="descname">StencilOp</code><span class="sig-paren">(</span><em>left</em>, <em>right</em>, <em>op</em><span class="sig-paren">)</span><a class="headerlink" href="#stencil.nodes.StencilOp" title="Permalink to this definition">¶</a></dt>
+<dd><p>An operation between stencil nodes. Will also be created as the result of mathematical operations on StencilComponents</p>
+</dd></dl>
+
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="index.html" title="previous chapter">Welcome to stencil&#8217;s documentation!</a></li>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/nodes.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2015, Nathan Zhang.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.3.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.6</a>
+      
+      |
+      <a href="_sources/nodes.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

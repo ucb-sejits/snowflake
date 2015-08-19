@@ -1,0 +1,148 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>&lt;no title&gt; &mdash; stencil 0.1 documentation</title>
+    
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="top" title="stencil 0.1 documentation" href="index.html" />
+    <link rel="prev" title="&lt;no title&gt;" href="nodes.html" />
+   
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+
+  </head>
+  <body role="document">  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <p>Contents:</p>
+<div class="toctree-wrapper compound" id="vector">
+<ul class="simple">
+</ul>
+</div>
+<dl class="class">
+<dt id="stencil.vector.Vector">
+<em class="property">class </em><code class="descclassname">stencil.vector.</code><code class="descname">Vector</code><a class="headerlink" href="#stencil.vector.Vector" title="Permalink to this definition">¶</a></dt>
+<dd><p>A Vector that supports arithmetic. These can be used for numpy indicies and has neighborhood utility functions.</p>
+<dl class="classmethod">
+<dt id="stencil.vector.Vector.moore_vectors">
+<em class="property">classmethod </em><code class="descname">moore_vectors</code><span class="sig-paren">(</span><em>ndim</em>, <em>radius=1</em>, <em>closed=False</em><span class="sig-paren">)</span><a class="headerlink" href="#stencil.vector.Vector.moore_vectors" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>ndim</strong> &#8211; Number of dimensions</li>
+<li><strong>radius</strong> &#8211; Moore Neighborhood radius</li>
+<li><strong>closed</strong> &#8211; Should the neighborhood include all points r &lt; radius or only r = radius</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">Iterator of vectors in the Moore neighborhood, <span class="math">\(\{v | v \in Z^n, ||v||_1 = r\}\)</span></p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="classmethod">
+<dt id="stencil.vector.Vector.von_neumann_vectors">
+<em class="property">classmethod </em><code class="descname">von_neumann_vectors</code><span class="sig-paren">(</span><em>ndim</em>, <em>radius=1</em>, <em>closed=False</em><span class="sig-paren">)</span><a class="headerlink" href="#stencil.vector.Vector.von_neumann_vectors" title="Permalink to this definition">¶</a></dt>
+<dd><table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>ndim</strong> &#8211; Number of dimensions</li>
+<li><strong>radius</strong> &#8211; Von Neumann Neighborhood radius</li>
+<li><strong>closed</strong> &#8211; Should the neighborhood include all points r &lt; radius or only r = radius</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">Iterator of vectors in the Von Neumann neighborhood, <span class="math">\(\{v | v \in Z^n, ||v||_\infty = r\}\)</span></p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</dd></dl>
+
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="nodes.html" title="previous chapter">&lt;no title&gt;</a></li>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/vector.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2015, Nathan Zhang.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.3.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.6</a>
+      
+      |
+      <a href="_sources/vector.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

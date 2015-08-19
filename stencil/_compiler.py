@@ -163,22 +163,8 @@ class OpSimplifier(ast.NodeTransformer):
         if isinstance(result, (int, float)):
             return ast.Num(n=result)
 
-
-
-class DependencyAnalyzer(ast.NodeVisitor):
-
-    def visit_StencilComponent(self, node):
-        dependencies = self.generic_visit(node)
-        name = node.name
-        node_dependencies = (vector for vector, index in zip(node.vectors, node.indices)
-                             if not (isinstance(node, StencilConstant) and node[index].value == 0))
-
-
 def find_names(node):
     names = set()
-    target = None
-    # if hasattr(node, 'name'):
-    #     names.add(node.name)
     class Visitor(ast.NodeVisitor):
         def visit_StencilComponent(self, node):
             names.add(node.name)
@@ -186,12 +172,9 @@ def find_names(node):
         def visit_Stencil(self, node):
             names.add(node.output)
             self.generic_visit(node)
-    # for n in ast.walk(node):
-    #     if isinstance(n, StencilComponent):
-    #         #print("found")
-    #         names.add(n.name)
-    #     elif isinstance(n, Stencil):
-    #         names.add(n.output)
     Visitor().visit(node)
     return names
 
+
+class Analyzer(object):
+    pass

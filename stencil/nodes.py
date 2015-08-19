@@ -280,5 +280,7 @@ class RangeNode(StencilNode):
 
 class StencilBlock(StencilNode):
     _fields = ['body']
+
     def __init__(self, body):
         self.body = body
+        super(StencilBlock, self).__init__()
