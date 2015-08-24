@@ -5,7 +5,7 @@ import copy
 import ctypes
 import itertools
 from ctree.c.nodes import String, FunctionCall, SymbolRef, FunctionDecl, For, Constant, Assign, Lt, AugAssign, AddAssign, \
-    CFile, Sub, ArrayRef
+    CFile, Sub, ArrayRef, MultiNode
 from ctree.jit import LazySpecializedFunction, ConcreteSpecializedFunction
 from ctree.nodes import Project
 from ctree.transformations import PyBasicConversions
@@ -14,7 +14,7 @@ import math
 from ctree.types import get_ctype
 from rebox.specializers.order import Ordering
 from _compiler import StencilCompiler, find_names, ArrayOpRecognizer, OpSimplifier
-from nodes import WeightArray, SparseWeightArray
+from nodes import WeightArray, SparseWeightArray, Stencil, StencilBlock
 
 import numpy as np
 
@@ -232,6 +232,10 @@ class CCompiler(Compiler):
                 ]
             return inside[0]
 
+    class BlockConverter(ast.NodeTransformer):
+        def visit_Block(self, node):
+            return MultiNode(body=node.body)
+
 
     class ConcreteSpecializedKernel(ConcreteSpecializedFunction):
         def finalize(self, entry_point_name, project_node, entry_point_typesig):
@@ -311,6 +315,10 @@ class CCompiler(Compiler):
         py_ast = self.IndexOpToEncode().visit(compiled)
         ast.fix_missing_locations(py_ast)
         # print("NEW KERNEL")
+        if isinstance(original, Stencil):
+            name = original.output
+        elif isinstance(original, StencilBlock):
+            name = original.body[-1].output
         return self.LazySpecializedKernel(
             py_ast=py_ast,
             names=find_names(original),

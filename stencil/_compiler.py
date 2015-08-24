@@ -2,7 +2,7 @@ import ast
 import functools
 import operator
 
-from compiler_nodes import ArrayIndex, IndexOp, IterationSpace
+from compiler_nodes import ArrayIndex, IndexOp, IterationSpace, Block
 from nodes import StencilComponent, StencilConstant
 from nodes import Stencil
 
@@ -24,7 +24,7 @@ class StencilCompiler(ast.NodeVisitor):
         self.ndim = ndim
 
     def visit_StencilBlock(self, node):
-        return [self.visit(i) for i in node.body]
+        return Block([self.visit(i) for i in node.body])
 
     def visit_Stencil(self, node):
         body = self.visit(node.op_tree)

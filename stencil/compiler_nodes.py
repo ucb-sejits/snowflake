@@ -78,3 +78,8 @@ class IterationSpace(StencilCompilerNode):
             copy.deepcopy(self.space, memo=memo),
             copy.deepcopy(self.body, memo=memo)
         )
+
+class Block(StencilCompilerNode):
+    _fields = ['body']
+    def __init__(self, body):
+        self.body = body
