@@ -267,6 +267,13 @@ class StencilOp(StencilNode):
 
     __rdiv__ = lambda x, y: StencilOp.__div__(y, x)
 
+    def __deepcopy__(self, memo):
+        return type(self)(
+            copy.deepcopy(self.left, memo),
+            copy.deepcopy(self.right, memo),
+            self.op
+        )
+
 
 class RangeNode(StencilNode):
     _fields = ['target', 'body']
@@ -278,9 +285,28 @@ class RangeNode(StencilNode):
     def __deepcopy__(self, memo):
         return RangeNode(self.target, self.iterator, copy.deepcopy(self.body))
 
-class StencilBlock(StencilNode):
+class StencilGroup(StencilNode):
     _fields = ['body']
 
     def __init__(self, body):
         self.body = body
-        super(StencilBlock, self).__init__()
+        super(StencilGroup, self).__init__()
+
+class VariableUpdate(StencilNode):
+    _fields = ['sources', 'targets']
+
+    def __init__(self, updates=None, **kwargs):
+        if updates:
+            kwargs.update(updates)
+        self.updates = kwargs
+
+    @property
+    def sources(self):
+        return self.updates.values()
+
+    @property
+    def targets(self):
+        return self.updates.keys()
+
+    def __deepcopy__(self, memo):
+        return VariableUpdate(self.updates)

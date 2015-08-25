@@ -14,7 +14,7 @@ import math
 from ctree.types import get_ctype
 from rebox.specializers.order import Ordering
 from _compiler import StencilCompiler, find_names, ArrayOpRecognizer, OpSimplifier
-from nodes import WeightArray, SparseWeightArray, Stencil, StencilBlock
+from nodes import WeightArray, SparseWeightArray, Stencil, StencilGroup
 
 import numpy as np
 
@@ -43,6 +43,9 @@ class Compiler(object):
 
     def _compile(self, node, index_name, **kwargs):
         ndim = self.get_ndim(node)
+        # wrapping the stencil into a block
+        if not isinstance(node, StencilGroup):
+            node = StencilGroup([node])
         stack = [
             StencilCompiler(index_name, ndim),
             OpSimplifier(),
@@ -50,16 +53,15 @@ class Compiler(object):
         ]
         output = node
         for transformer in stack:
-            #print(transformer)
-            #print(dump(output))
             output = transformer.visit(output)
-        #print(dump(output))
         return output
 
     def _post_process(self, original, compiled, index_name, **kwargs):
         raise NotImplementedError("PostProcessing isn't implemented")
 
     def compile(self, node, **kwargs):
+        if not isinstance(node, StencilGroup):
+            node = StencilGroup([node])
         compiled = self._compile(node, self.index_name, **kwargs)
         processed = self._post_process(node, compiled, self.index_name, **kwargs)
         return processed
@@ -152,9 +154,7 @@ class PythonCompiler(Compiler):
             return nested
 
     def _post_process(self, original, compiled, index_name, **kwargs):
-        #print(compiled)
-        target_name = original.output
-        nodes = list(compiled) if isinstance(compiled, (list, tuple)) else [compiled]
+        target_name = original.body[-1].output
         #nodes = [self.IterationSpaceConverter(self.index_name).visit(node) for node in nodes]
         array_names = find_names(original)
         function_name = 'kernel'
@@ -172,16 +172,13 @@ class PythonCompiler(Compiler):
                 kwarg=None,
                 defaults=[]
             ),
-            body=nodes,
+            body=compiled.body,
             decorator_list=[]
         )
         # print("hello")
         tree = ast.Module(body=[tree])
         tree = self.BasicIndexOpConverter().visit(tree)
-        tree = self.IterationSpaceConverter(self.index_name, original.output).visit(tree)
-        # for p in ast.walk(tree):
-        #     print(p, type(p))
-        print(dump(tree))
+        tree = self.IterationSpaceConverter(self.index_name, original.body[-1].output).visit(tree)
         tree = ast.fix_missing_locations(tree)
         code = compile(tree, '<string>', 'exec')
         exec code in globals(), locals()
@@ -194,6 +191,10 @@ class CCompiler(Compiler):
     def __init__(self, *args):
         super(CCompiler, self).__init__(*args)
         self._lsk = None
+
+    class BlockConverter(ast.NodeTransformer):
+        def visit_Block(self, node):
+            return MultiNode(node.body)
 
     class IndexOpToEncode(ast.NodeTransformer):
         def visit_IndexOp(self, node):
@@ -290,6 +291,7 @@ class CCompiler(Compiler):
                 defn=[c_tree]
             )
             c_func = CCompiler.IterationSpaceExpander(self.index_name, subconfig[self.target_name].shape).visit(c_func)
+            c_func = CCompiler.BlockConverter().visit(c_func)
             # print(c_func)
             # print(encode_func)
             out_file = CFile(body=[encode_func, c_func])
@@ -314,14 +316,9 @@ class CCompiler(Compiler):
     def _post_process(self, original, compiled, index_name, **kwargs):
         py_ast = self.IndexOpToEncode().visit(compiled)
         ast.fix_missing_locations(py_ast)
-        # print("NEW KERNEL")
-        if isinstance(original, Stencil):
-            name = original.output
-        elif isinstance(original, StencilBlock):
-            name = original.body[-1].output
         return self.LazySpecializedKernel(
             py_ast=py_ast,
             names=find_names(original),
             index_name=index_name,
-            target_name=original.output
+            target_name=original.body[-1].output
         )

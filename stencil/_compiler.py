@@ -23,8 +23,14 @@ class StencilCompiler(ast.NodeVisitor):
         self.index_name = index_name
         self.ndim = ndim
 
-    def visit_StencilBlock(self, node):
+    def visit_StencilGroup(self, node):
         return Block([self.visit(i) for i in node.body])
+
+    def visit_VariableUpdate(self, node):
+        sources = ast.Tuple(elts=[ast.Name(id=name, ctx=ast.Load()) for name in node.sources], ctx=ast.Load())
+        targets = ast.Tuple(elts=[ast.Name(id=name, ctx=ast.Store()) for name in node.targets], ctx=ast.Store())
+        return ast.Assign(targets=[targets], value=sources)
+
 
     def visit_Stencil(self, node):
         body = self.visit(node.op_tree)

@@ -83,3 +83,6 @@ class Block(StencilCompilerNode):
     _fields = ['body']
     def __init__(self, body):
         self.body = body
+
+    def __deepcopy__(self, memo):
+        return type(self)(copy.deepcopy(self.body, memo))
