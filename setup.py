@@ -1,16 +1,16 @@
 from distutils.core import setup
 
 setup(
-    name='stencil',
+    name='snowflake',
     version='0.1.0',
-    url='github.com/ucb-sejits/stencil',
+    url='github.com/ucb-sejits/snowflake',
     license='B',
     author='Nathan Zhang',
     author_email='nzhang32@berkeley.edu',
     description='DSL/IR for Stencils in Python',
 
     packages=[
-        'stencil'
+        'snowflake'
     ],
 
     install_requires=[

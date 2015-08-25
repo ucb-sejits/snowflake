@@ -12,7 +12,7 @@ class StencilNode(ast.AST):
 
 class Stencil(StencilNode):
     """
-    A Stencil is defined by it's operation tree (stencil components or other things), where it outputs, and the space it iterates over
+    A Stencil is defined by it's operation tree (snowflake components or other things), where it outputs, and the space it iterates over
     """
 
     _fields = ["op_tree", "output", "iteration_space"]
@@ -220,7 +220,7 @@ class SparseWeightArray(StencilNode):
 
 class StencilOp(StencilNode):
     """
-    An operation between stencil nodes. Will also be created as the result of mathematical operations on StencilComponents
+    An operation between snowflake nodes. Will also be created as the result of mathematical operations on StencilComponents
     """
     _fields = ['left', 'right']
 

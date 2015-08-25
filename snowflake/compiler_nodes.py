@@ -52,7 +52,7 @@ class ArrayIndex(IndexOp):
 
 class IterationSpace(StencilCompilerNode):
     """
-    Semantic node for the space over which a stencil is applied.
+    Semantic node for the space over which a snowflake is applied.
     """
     _fields = ['space', 'body']
 

@@ -43,7 +43,7 @@ class Compiler(object):
 
     def _compile(self, node, index_name, **kwargs):
         ndim = self.get_ndim(node)
-        # wrapping the stencil into a block
+        # wrapping the snowflake into a block
         if not isinstance(node, StencilGroup):
             node = StencilGroup([node])
         stack = [

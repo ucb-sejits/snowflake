@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# stencil documentation build configuration file, created by
+# snowflake documentation build configuration file, created by
 # sphinx-quickstart on Sat Aug  8 19:53:53 2015.
 #
 # This file is execfile()d with the current directory set to its
@@ -50,7 +50,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'stencil'
+project = u'snowflake'
 copyright = u'2015, Nathan Zhang'
 author = u'Nathan Zhang'
 
@@ -226,7 +226,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-  (master_doc, 'stencil.tex', u'stencil Documentation',
+  (master_doc, 'snowflake.tex', u'snowflake Documentation',
    u'Nathan Zhang', 'manual'),
 ]
 
@@ -256,7 +256,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'stencil', u'stencil Documentation',
+    (master_doc, 'snowflake', u'snowflake Documentation',
      [author], 1)
 ]
 
@@ -270,8 +270,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-  (master_doc, 'stencil', u'stencil Documentation',
-   author, 'stencil', 'One line description of project.',
+  (master_doc, 'snowflake', u'snowflake Documentation',
+   author, 'snowflake', 'One line description of project.',
    'Miscellaneous'),
 ]
 
