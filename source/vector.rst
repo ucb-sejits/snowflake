@@ -5,5 +5,5 @@ Contents:
     :maxdepth: 2
 
 
-.. autoclass:: stencil.vector.Vector
+.. autoclass:: snowflake.vector.Vector
     :members: von_neumann_vectors, moore_vectors

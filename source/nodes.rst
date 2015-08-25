@@ -4,5 +4,5 @@ Contents:
    :name: Nodes
    :maxdepth: 2
 
-.. automodule:: stencil.nodes
+.. automodule:: snowflake.nodes
    :members: Stencil, StencilComponent, WeightArray, SparseWeightArray, StencilOp
