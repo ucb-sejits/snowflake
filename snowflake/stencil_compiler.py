@@ -46,6 +46,8 @@ class Compiler(object):
         # wrapping the snowflake into a block
         if not isinstance(node, StencilGroup):
             node = StencilGroup([node])
+
+        node = copy.deepcopy(node)
         stack = [
             StencilCompiler(index_name, ndim),
             OpSimplifier(),
@@ -256,6 +258,7 @@ class CCompiler(Compiler):
             self.names = names
             self.target_name = target_name
             self.index_name = index_name
+            self.sub_dir = 'snowflake_' + self.sub_dir
 
         @property
         def arg_spec(self):
@@ -263,7 +266,7 @@ class CCompiler(Compiler):
 
         class Subconfig(OrderedDict):
             def __hash__(self):
-                return hash(tuple((name, arg.shape) for name, arg in sorted(self.items())))
+                return hash(tuple((name, arg.shape, arg.dtype) for name, arg in sorted(self.items())))
 
         def args_to_subconfig(self, args):
             names_to_use = self.arg_spec

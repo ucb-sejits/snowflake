@@ -23,7 +23,12 @@ class Stencil(StencilNode):
         self.output = output
         self.iteration_space = iteration_space
 
-
+    def __deepcopy__(self, memo):
+        return type(self)(
+            copy.deepcopy(self.op_tree, memo),
+            copy.deepcopy(self.output, memo),
+            copy.deepcopy(self.iteration_space, memo)
+        )
 
 class StencilComponent(StencilNode):
     """
@@ -60,13 +65,7 @@ class StencilComponent(StencilNode):
         return self.weights[item]
 
     def __deepcopy__(self, memo):
-        print('deepcopy', memo)
-        return self
-
-    def __copy__(self):
-        print('copy')
-        return self
-
+        return type(self)(self.name, copy.deepcopy(self.weights, memo))
 
 class StencilConstant(StencilNode):
     """
@@ -97,7 +96,7 @@ class StencilConstant(StencilNode):
     def __sub__(self, other):
         return self.__apply_op(self, other, operator.sub)
 
-    __rsub__ = lambda x, y: StencilComponent.__sub__(y, x)
+    __rsub__ = lambda x, y: StencilConstant.__sub__(y, x)
 
     def __mul__(self, other):
         return self.__apply_op(self, other, operator.mul)
@@ -107,7 +106,10 @@ class StencilConstant(StencilNode):
     def __div__(self, other):
         return self.__apply_op(self, other, operator.div)
 
-    __rdiv__ = lambda x, y: StencilComponent.__div__(y, x)
+    __rdiv__ = lambda x, y: StencilConstant.__div__(y, x)
+
+    def __deepcopy__(self, memo):
+        return StencilConstant(self.value)
 
 
 class WeightArray(StencilNode):
@@ -143,7 +145,7 @@ class WeightArray(StencilNode):
     def __componentize(cls, arr):
         if not isinstance(arr[0], Iterable):
             return [
-                el if isinstance(el, StencilComponent) else StencilConstant(el) for el in arr
+                el if isinstance(el, StencilNode) else StencilConstant(el) for el in arr
             ]
         return [cls.__componentize(sub_array) for sub_array in arr]
 
@@ -175,6 +177,9 @@ class WeightArray(StencilNode):
                 obj = obj[s]
             obj[key[-1]] = value
         self.data[key] = value
+
+    def __deepcopy__(self, memo):
+        return WeightArray(self.data)
 
 
 class SparseWeightArray(StencilNode):
@@ -217,6 +222,8 @@ class SparseWeightArray(StencilNode):
     def __setitem__(self, key, value):
         self.__weight_map[key] = value
 
+    def __deepcopy__(self, memo):
+        return type(self)(copy.deepcopy(self.__weight_map, memo))
 
 class StencilOp(StencilNode):
     """
@@ -274,23 +281,15 @@ class StencilOp(StencilNode):
             self.op
         )
 
-
-class RangeNode(StencilNode):
-    _fields = ['target', 'body']
-    def __init__(self, target, iterator, body):
-        self.iterator = iterator
-        self.target = target
-        self.body = body
-
-    def __deepcopy__(self, memo):
-        return RangeNode(self.target, self.iterator, copy.deepcopy(self.body))
-
 class StencilGroup(StencilNode):
     _fields = ['body']
 
     def __init__(self, body):
         self.body = body
         super(StencilGroup, self).__init__()
+
+    def __deepcopy__(self, memo):
+        return type(self)(copy.deepcopy(self.body, memo))
 
 class VariableUpdate(StencilNode):
     _fields = ['sources', 'targets']

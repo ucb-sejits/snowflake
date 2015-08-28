@@ -9,7 +9,10 @@ class StencilCompilerNode(ast.AST):
     """
     Generic Parent class or Stencil Nodes
     """
-    pass
+
+
+    def __deepcopy__(self, memo):
+        print(type(self).__name__)
 
 
 class IndexOp(StencilCompilerNode):

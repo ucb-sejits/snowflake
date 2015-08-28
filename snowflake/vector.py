@@ -83,3 +83,6 @@ class Vector(tuple):
 
     def __pos__(self):
         return self
+
+    def __deepcopy__(self, memo):
+        return type(self)(self)
