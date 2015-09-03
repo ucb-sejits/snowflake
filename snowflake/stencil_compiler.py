@@ -1,3 +1,4 @@
+from __future__ import division
 import abc
 import ast
 from collections import Iterable, OrderedDict
@@ -5,7 +6,7 @@ import copy
 import ctypes
 import itertools
 from ctree.c.nodes import String, FunctionCall, SymbolRef, FunctionDecl, For, Constant, Assign, Lt, AugAssign, AddAssign, \
-    CFile, Sub, ArrayRef, MultiNode
+    CFile, Sub, ArrayRef, MultiNode, Mul, Add, LtE, TernaryOp, And
 from ctree.jit import LazySpecializedFunction, ConcreteSpecializedFunction
 from ctree.nodes import Project
 from ctree.transformations import PyBasicConversions
@@ -214,30 +215,57 @@ class CCompiler(Compiler):
             return self.visit_IndexOp(node)
 
     class IterationSpaceExpander(ast.NodeTransformer):
-        def __init__(self, index_name, reference_array_shape):
+        def __init__(self, index_name, reference_array_shape, block_size=(32, 32)):
             self.index_name = index_name
             self.reference_array_shape = reference_array_shape
+            self.block_size = block_size
 
         def visit_IterationSpace(self, node):
             node = self.generic_visit(node)
             inside = node.body
-            make_low = lambda low, dim: Constant(low) if low >= 0 else Constant(self.reference_array_shape[dim] + low)
-            make_high = lambda high, dim: Constant(high) if high > 0 else Constant(self.reference_array_shape[dim] + high)
-            for dim, iteration_range in reversed(list(enumerate(node.space))):
-
-                inside = [
-                    For(
-                        init=Assign(SymbolRef("{}_{}".format(self.index_name, dim)), make_low(iteration_range.low, dim)),
-                        test=Lt(SymbolRef("{}_{}".format(self.index_name, dim)), make_high(iteration_range.high, dim)),
-                        incr=AddAssign(SymbolRef("{}_{}".format(self.index_name, dim)), Constant(iteration_range.stride or 1)),
-                        body=inside
+            make_low = lambda low, dim: low if low >= 0 else self.reference_array_shape[dim] + low
+            make_high = lambda high, dim: high if high > 0 else self.reference_array_shape[dim] + high
+            insides = []
+            outsides = []
+            for dim, (iteration_range, block_size) in enumerate(itertools.izip_longest(node.space,
+                                                                                       self.block_size, fillvalue=0)):
+                stride = iteration_range.stride or 1
+                low = make_low(iteration_range.low, dim)
+                high = make_high(iteration_range.high, dim)
+                if block_size:
+                    num_iterations = int(math.ceil((high - low) / block_size))
+                    outer = SymbolRef('{}_{}_outer'.format(self.index_name, dim))
+                    for_loop = For(
+                        init=Assign(outer.copy(), Constant(low)),
+                        test=Lt(outer, Constant(high)),
+                        incr=AddAssign(outer, Constant(block_size))
                     )
-                ]
-            return inside[0]
-
-    class BlockConverter(ast.NodeTransformer):
-        def visit_Block(self, node):
-            return MultiNode(body=node.body)
+                    outsides.append(for_loop)
+                    inner = SymbolRef('{}_{}'.format(self.index_name, dim))
+                    inner_for = For(
+                        init=Assign(inner.copy(), outer),
+                        test=And(
+                            Lt(inner, Add(outer, Constant(block_size))),
+                            Lt(inner, Constant(high))
+                        ),
+                        incr=AddAssign(inner, Constant(stride)),
+                        body=[]
+                    )
+                    insides.append(inner_for)
+                else:
+                    insides.append(
+                        For(
+                            init=Assign(SymbolRef("{}_{}".format(self.index_name, dim)), Constant(low)),
+                            test=Lt(SymbolRef("{}_{}".format(self.index_name, dim)), Constant(high)),
+                            incr=AddAssign(SymbolRef("{}_{}".format(self.index_name, dim)), Constant(stride)),
+                            body=[]
+                        )
+                )
+            all_loops = insides + outsides
+            for loop in all_loops:
+                loop.body = [inside]
+                inside = loop
+            return inside
 
 
     class ConcreteSpecializedKernel(ConcreteSpecializedFunction):
