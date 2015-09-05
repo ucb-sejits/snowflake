@@ -65,8 +65,9 @@ class Compiler(object):
     def compile(self, node, **kwargs):
         if not isinstance(node, StencilGroup):
             node = StencilGroup([node])
+        copied = copy.deepcopy(node)
         compiled = self._compile(node, self.index_name, **kwargs)
-        processed = self._post_process(node, compiled, self.index_name, **kwargs)
+        processed = self._post_process(copied, compiled, self.index_name, **kwargs)
         return processed
 
 
@@ -215,56 +216,11 @@ class CCompiler(Compiler):
             return self.visit_IndexOp(node)
 
     class IterationSpaceExpander(ast.NodeTransformer):
-        def __init__(self, index_name, reference_array_shape, block_size=(32, 32)):
+        def __init__(self, index_name, reference_array_shape, block_size=(64, 64)):
             self.index_name = index_name
             self.reference_array_shape = reference_array_shape
             self.block_size = block_size
 
-        # def visit_IterationSpace(self, node):
-        #     node = self.generic_visit(node)
-        #     inside = node.body
-        #     make_low = lambda low, dim: low if low >= 0 else self.reference_array_shape[dim] + low
-        #     make_high = lambda high, dim: high if high > 0 else self.reference_array_shape[dim] + high
-        #     insides = []
-        #     outsides = []
-        #     for dim, (iteration_range, block_size) in enumerate(itertools.izip_longest(node.space,
-        #                                                                                self.block_size, fillvalue=0)):
-        #         stride = iteration_range.stride or 1
-        #         low = make_low(iteration_range.low, dim)
-        #         high = make_high(iteration_range.high, dim)
-        #         if block_size and block_size <= high - low:
-        #             outer = SymbolRef('{}_{}_outer'.format(self.index_name, dim))
-        #             for_loop = For(
-        #                 init=Assign(outer.copy(), Constant(low)),
-        #                 test=Lt(outer, Constant(high)),
-        #                 incr=AddAssign(outer, Constant(block_size))
-        #             )
-        #             outsides.append(for_loop)
-        #             inner = SymbolRef('{}_{}'.format(self.index_name, dim))
-        #             inner_for = For(
-        #                 init=Assign(inner.copy(), outer),
-        #                 test=And(
-        #                     Lt(inner, Add(outer, Constant(block_size))),
-        #                     Lt(inner, Constant(high))
-        #                 ),
-        #                 incr=AddAssign(inner, Constant(stride)),
-        #                 body=[]
-        #             )
-        #             insides.append(inner_for)
-        #         else:
-        #             insides.append(
-        #                 For(
-        #                     init=Assign(SymbolRef("{}_{}".format(self.index_name, dim)), Constant(low)),
-        #                     test=Lt(SymbolRef("{}_{}".format(self.index_name, dim)), Constant(high)),
-        #                     incr=AddAssign(SymbolRef("{}_{}".format(self.index_name, dim)), Constant(stride)),
-        #                     body=[]
-        #                 )
-        #         )
-        #     all_loops = insides + outsides
-        #     for loop in all_loops:
-        #         loop.body = [inside]
-        #         inside = loop
-        #     return inside
 
         def visit_IterationSpace(self, node):
             node = self.generic_visit(node)
@@ -295,21 +251,27 @@ class CCompiler(Compiler):
 
 
     class LazySpecializedKernel(LazySpecializedFunction):
-        def __init__(self, py_ast=None, sub_dir=None, backend_name="default", names=None, target_name='out', index_name='index'):
+        def __init__(self, py_ast=None, names=None, target_name='out', index_name='index',
+                     _hash=None):
             #print(dump(py_ast))
-            super(CCompiler.LazySpecializedKernel, self).__init__(py_ast, sub_dir, backend_name)
+            self.__hash = _hash if _hash is not None else hash(py_ast)
             self.names = names
             self.target_name = target_name
             self.index_name = index_name
-            self.sub_dir = 'snowflake_' + self.sub_dir
+
+            super(CCompiler.LazySpecializedKernel, self).__init__(py_ast, 'snowflake_' + hex(hash(self)))
+
 
         @property
         def arg_spec(self):
             return [self.target_name] + list(sorted(self.names - {self.target_name}))
 
+        def __hash__(self):
+            return self.__hash + hash((self.target_name, self.index_name))
+
         class Subconfig(OrderedDict):
             def __hash__(self):
-                return hash(tuple((name, arg.shape, arg.dtype) for name, arg in sorted(self.items())))
+                return hash(tuple(sorted((name, arg.shape, str(arg.dtype)) for name, arg in sorted(self.items()))))
 
         def args_to_subconfig(self, args):
             names_to_use = self.arg_spec
@@ -319,7 +281,6 @@ class CCompiler(Compiler):
             return subconf
 
         def transform(self, tree, program_config):
-            # print("NEW FILE")
             subconfig, tuning_config = program_config
             CCompiler.IndexOpToEncode().visit(tree)
             ndim = subconfig[self.target_name].ndim
@@ -362,9 +323,11 @@ class CCompiler(Compiler):
     def _post_process(self, original, compiled, index_name, **kwargs):
         py_ast = self.IndexOpToEncode().visit(compiled)
         ast.fix_missing_locations(py_ast)
+        #print(hash(original))
         return self.LazySpecializedKernel(
             py_ast=py_ast,
             names=find_names(original),
             index_name=index_name,
-            target_name=original.body[-1].output
+            target_name=original.body[-1].output,
+            _hash=hash(original)
         )

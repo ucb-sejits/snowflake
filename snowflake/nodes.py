@@ -31,7 +31,8 @@ class Stencil(StencilNode):
         )
 
     def __hash__(self):
-        return hash(hash(self.op_tree), hash(self.output), hash(self.iteration_space))
+        iteration_space = tuple(tuple(i) for i in self.iteration_space)
+        return hash((hash(self.op_tree), hash(self.output), hash(iteration_space)))
 
 class StencilComponent(StencilNode):
     """
@@ -71,7 +72,7 @@ class StencilComponent(StencilNode):
         return type(self)(self.name, copy.deepcopy(self.weights, memo))
 
     def __hash__(self):
-        return hash(hash(self.name), hash(self.weights))
+        return hash((hash(self.name), hash(self.weights)))
 
 class StencilConstant(StencilNode):
     """
@@ -191,7 +192,7 @@ class WeightArray(StencilNode):
         return WeightArray(self.data)
 
     def __hash__(self):
-        return hash(tuple(self.weights))
+        return hash((tuple(self.weights), tuple(self.vectors)))
 
 
 class SparseWeightArray(StencilNode):
@@ -238,7 +239,7 @@ class SparseWeightArray(StencilNode):
         return type(self)(copy.deepcopy(self.__weight_map, memo))
 
     def __hash__(self):
-        return hash((self.weights, hash(self.vectors)))
+        return hash((tuple(self.weights), hash(tuple(self.vectors))))
 
 class StencilOp(StencilNode):
     """
@@ -297,7 +298,7 @@ class StencilOp(StencilNode):
         )
 
     def __hash__(self):
-        return hash((self.op, self.left, self.right))
+        return hash((self._op_map[self.op], hash(self.left), hash(self.right)))
 
 class StencilGroup(StencilNode):
     _fields = ['body']
@@ -310,7 +311,7 @@ class StencilGroup(StencilNode):
         return type(self)(copy.deepcopy(self.body, memo))
 
     def __hash__(self):
-        return hash(tuple(i for i in self.body))
+        return hash(tuple(hash(i) for i in self.body))
 
 class VariableUpdate(StencilNode):
     _fields = ['sources', 'targets']
