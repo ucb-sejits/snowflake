@@ -12,7 +12,8 @@ class StencilCompilerNode(ast.AST):
 
 
     def __deepcopy__(self, memo):
-        print(type(self).__name__)
+        print('Copying: ' + str(type(self).__name__))
+        raise NotImplementedError("{} does not have __deepcopy__ implemented".format(type(self).__name__))
 
 
 class IndexOp(StencilCompilerNode):
@@ -39,6 +40,9 @@ class IndexOp(StencilCompilerNode):
     def ndim(self):
         return len(self.elts)
 
+    def __deepcopy__(self, memo):
+        return type(self)(copy.deepcopy(self.elts, memo))
+
 
 class ArrayIndex(IndexOp):
     """
@@ -51,6 +55,9 @@ class ArrayIndex(IndexOp):
             ]
         )
         self._name = name
+
+    def __deepcopy__(self, memo):
+        return type(self)(self.name, self.ndim)
 
 
 class IterationSpace(StencilCompilerNode):

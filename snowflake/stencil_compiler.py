@@ -7,6 +7,7 @@ import ctypes
 import itertools
 from ctree.c.nodes import String, FunctionCall, SymbolRef, FunctionDecl, For, Constant, Assign, Lt, AugAssign, AddAssign, \
     CFile, Sub, ArrayRef, MultiNode, Mul, Add, LtE, TernaryOp, And
+from ctree.cpp.nodes import CppInclude
 from ctree.jit import LazySpecializedFunction, ConcreteSpecializedFunction
 from ctree.nodes import Project
 from ctree.transformations import PyBasicConversions
@@ -20,6 +21,7 @@ from nodes import WeightArray, SparseWeightArray, Stencil, StencilGroup
 import numpy as np
 
 from rebox.specializers.rm.encode import MultiplyEncode
+from snowflake.compiler_utils import generate_encode_macro
 
 __author__ = 'nzhang-dev'
 
@@ -65,8 +67,9 @@ class Compiler(object):
     def compile(self, node, **kwargs):
         if not isinstance(node, StencilGroup):
             node = StencilGroup([node])
+        original = copy.deepcopy(node)
         copied = copy.deepcopy(node)
-        compiled = self._compile(node, self.index_name, **kwargs)
+        compiled = self._compile(original, self.index_name, **kwargs)
         processed = self._post_process(copied, compiled, self.index_name, **kwargs)
         return processed
 
@@ -192,6 +195,10 @@ class PythonCompiler(Compiler):
 
 class CCompiler(Compiler):
 
+    @staticmethod
+    def _shape_to_str(shape):
+        return '_'.join(map(str, shape))
+
     def __init__(self, *args):
         super(CCompiler, self).__init__(*args)
         self._lsk = None
@@ -201,9 +208,13 @@ class CCompiler(Compiler):
             return MultiNode(node.body)
 
     class IndexOpToEncode(ast.NodeTransformer):
+        def __init__(self, name_shape_map):
+            self.name_shape_map = name_shape_map
+            self.shapes = []
+
         def visit_IndexOp(self, node):
             return ast.Call(
-                func=ast.Name(id="encode", ctx=ast.Load()),
+                func=ast.Name(id="encode"+CCompiler._shape_to_str(self.shapes[-1]), ctx=ast.Load()),
                 args=[
                     self.visit(elt) for elt in node.elts
                 ],
@@ -211,6 +222,14 @@ class CCompiler(Compiler):
                 kwarg=None,
                 starargs=None
             )
+
+        def visit_Subscript(self, node):
+            node_name = node.value.id
+            self.shapes.append(self.name_shape_map[node_name])
+            node.slice = self.visit(node.slice)
+            self.shapes.pop(-1)
+            return node
+
 
         def visit_ArrayIndex(self, node):
             return self.visit_IndexOp(node)
@@ -282,12 +301,14 @@ class CCompiler(Compiler):
 
         def transform(self, tree, program_config):
             subconfig, tuning_config = program_config
-            CCompiler.IndexOpToEncode().visit(tree)
+            name_shape_map = {name: arg.shape for name, arg in subconfig.items()}
+            shapes = set(name_shape_map.values())
+            CCompiler.IndexOpToEncode(name_shape_map).visit(tree)
             ndim = subconfig[self.target_name].ndim
+            encode_funcs = []
             c_tree = PyBasicConversions().visit(tree)
-            ordering = Ordering([MultiplyEncode()])
-            bits_per_dim = min([math.log(i, 2) for i in subconfig[self.target_name].shape]) + 1
-            encode_func = ordering.generate(ndim, bits_per_dim, ctypes.c_uint64)
+            for shape in shapes:
+                encode_funcs.append(generate_encode_macro('encode'+CCompiler._shape_to_str(shape), shape))
             c_func = FunctionDecl(
                 name=SymbolRef("kernel"),
                 params=[
@@ -297,11 +318,19 @@ class CCompiler(Compiler):
                 ],
                 defn=[c_tree]
             )
-            c_func = CCompiler.IterationSpaceExpander(self.index_name, subconfig[self.target_name].shape).visit(c_func)
+            if len(self.arg_spec) > 1:
+                shape = subconfig[self.arg_spec[1]].shape
+            else:
+                shape = subconfig[self.arg_spec[0]].shape
+            c_func = CCompiler.IterationSpaceExpander(self.index_name, shape).visit(c_func)
             c_func = CCompiler.BlockConverter().visit(c_func)
             # print(c_func)
             # print(encode_func)
-            out_file = CFile(body=[encode_func, c_func])
+            includes = [
+                CppInclude("stdint.h")
+            ]
+            out_file = CFile(body= includes + encode_funcs + [c_func])
+            # print(dump(out_file))
             return out_file
 
 
@@ -321,11 +350,9 @@ class CCompiler(Compiler):
             )
 
     def _post_process(self, original, compiled, index_name, **kwargs):
-        py_ast = self.IndexOpToEncode().visit(compiled)
-        ast.fix_missing_locations(py_ast)
         #print(hash(original))
         return self.LazySpecializedKernel(
-            py_ast=py_ast,
+            py_ast=compiled,
             names=find_names(original),
             index_name=index_name,
             target_name=original.body[-1].output,

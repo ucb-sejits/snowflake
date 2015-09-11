@@ -15,7 +15,7 @@ class Stencil(StencilNode):
     A Stencil is defined by it's operation tree (snowflake components or other things), where it outputs, and the space it iterates over
     """
 
-    _fields = ["op_tree", "output", "iteration_space"]
+    _fields = ["op_tree"]
 
     def __init__(self, op_tree, output, iteration_space):
         # iteration_space is an iterable of (low, high, stride), (low, high), or (high,) tuples
@@ -33,6 +33,29 @@ class Stencil(StencilNode):
     def __hash__(self):
         iteration_space = tuple(tuple(i) for i in self.iteration_space)
         return hash((hash(self.op_tree), hash(self.output), hash(iteration_space)))
+
+class ScalingStencil(StencilNode):
+
+    _fields = ["op_tree"]
+
+    def __init__(self, op_tree, output, iteration_space, source_offset, target_offset, scaling_factor):
+        self.op_tree = op_tree
+        self.output = output
+        self.iteration_space = iteration_space
+        self.source_offset = source_offset
+        self.target_offset = target_offset
+        self.scaling_factor = scaling_factor
+
+    def __deepcopy__(self, memo):
+        params = [
+            self.op_tree,
+            self.output,
+            self.iteration_space,
+            self.source_offset,
+            self.target_offset,
+            self.scaling_factor
+        ]
+        return type(self)(*[copy.deepcopy(i, memo) for i in params])
 
 class StencilComponent(StencilNode):
     """
