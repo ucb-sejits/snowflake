@@ -53,9 +53,23 @@ class ScalingStencil(StencilNode):
             self.iteration_space,
             self.source_offset,
             self.target_offset,
-            self.scaling_factor
+            self.scaling_factor,
         ]
         return type(self)(*[copy.deepcopy(i, memo) for i in params])
+
+    def __hash__(self):
+        params = [
+            self.op_tree,
+            self.output,
+            self.iteration_space,
+            self.source_offset,
+            self.target_offset,
+            self.scaling_factor,
+        ]
+        return hash(tuple(hash(param) for param in params))
+#
+# class Stencil(ScalingStencil):
+#     def __init__(self, op_tree, output, iteration_space):
 
 class StencilComponent(StencilNode):
     """

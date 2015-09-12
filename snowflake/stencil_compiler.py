@@ -314,7 +314,7 @@ class CCompiler(Compiler):
                 params=[
                     SymbolRef(name=arg_name, sym_type=get_ctype(
                         arg if not isinstance(arg, np.ndarray) else arg.ravel()
-                    )) for arg_name, arg in subconfig.items()
+                    ), _restrict=True) for arg_name, arg in subconfig.items()
                 ],
                 defn=[c_tree]
             )
@@ -329,7 +329,7 @@ class CCompiler(Compiler):
             includes = [
                 CppInclude("stdint.h")
             ]
-            out_file = CFile(body= includes + encode_funcs + [c_func])
+            out_file = CFile(body=includes + encode_funcs + [c_func])
             # print(dump(out_file))
             return out_file
 
