@@ -5,6 +5,8 @@ __author__ = 'nzhang-dev'
 
 import ast
 
+Space = namedtuple("Space", ['low', 'high', 'stride'])
+
 class StencilCompilerNode(ast.AST):
     """
     Generic Parent class or Stencil Nodes
@@ -66,21 +68,8 @@ class IterationSpace(StencilCompilerNode):
     """
     _fields = ['space', 'body']
 
-    Dimension = namedtuple("Dimension", ['low', 'high', 'stride'])
-
     def __init__(self, space, body):
-        new_space = []
-        for dim_range in space:
-            if len(dim_range) == 1:
-                dim_range = (0, dim_range[0], None)
-            elif len(dim_range) == 2:
-                dim_range = (dim_range[0], dim_range[1], None)
-            elif len(dim_range) == 3:
-                dim_range = tuple(dim_range)
-            else:
-                raise ValueError("Invalid arguments for IterationSpace")
-            new_space.append(self.Dimension(*dim_range))
-        self.space = tuple(new_space)
+        self.space = space
         self.body = body
 
     def __deepcopy__(self, memo):
@@ -88,6 +77,15 @@ class IterationSpace(StencilCompilerNode):
             copy.deepcopy(self.space, memo=memo),
             copy.deepcopy(self.body, memo=memo)
         )
+
+class SpaceUnion(StencilCompilerNode):
+
+    _fields = ['spaces']
+    def __init__(self, spaces):
+        self.spaces = spaces
+
+    def __deepcopy__(self, memo):
+        return SpaceUnion(copy.deepcopy(self.spaces, memo))
 
 class Block(StencilCompilerNode):
     _fields = ['body']

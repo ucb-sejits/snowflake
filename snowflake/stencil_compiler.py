@@ -243,6 +243,33 @@ class CCompiler(Compiler):
 
         def visit_IterationSpace(self, node):
             node = self.generic_visit(node)
+
+            make_low = lambda low, dim: Constant(low) if low >= 0 else Constant(self.reference_array_shape[dim] + low)
+            make_high = lambda high, dim: Constant(high) if high > 0 else Constant(self.reference_array_shape[dim] + high)
+            parts = []
+            for space in node.space.spaces:
+                inside = node.body
+                for dim, iteration_range in reversed(list(enumerate(zip(*space)))):
+                    inside = [
+                        For(
+                            init=Assign(SymbolRef("{}_{}".format(self.index_name, dim)), make_low(iteration_range[0], dim)),
+                            test=Lt(SymbolRef("{}_{}".format(self.index_name, dim)), make_high(iteration_range[1], dim)),
+                            incr=AddAssign(SymbolRef("{}_{}".format(self.index_name, dim)), Constant(iteration_range[2] or 1)),
+                            body=inside
+                        )
+                    ]
+                parts.extend(inside)
+            return MultiNode(parts)
+
+    class TiledIterationSpaceExpander(ast.NodeTransformer):
+        def __init__(self, index_name, reference_array_shape, block_size=(64, 64)):
+            self.index_name = index_name
+            self.reference_array_shape = reference_array_shape
+            self.block_size = block_size
+
+
+        def visit_IterationSpace(self, node):
+            node = self.generic_visit(node)
             inside = node.body
             make_low = lambda low, dim: Constant(low) if low >= 0 else Constant(self.reference_array_shape[dim] + low)
             make_high = lambda high, dim: Constant(high) if high > 0 else Constant(self.reference_array_shape[dim] + high)
@@ -355,6 +382,6 @@ class CCompiler(Compiler):
             py_ast=compiled,
             names=find_names(original),
             index_name=index_name,
-            target_name=original.body[-1].output,
+            target_name=original.body[-1].primary_mesh,
             _hash=hash(original)
         )

@@ -1,6 +1,7 @@
 import ast
 from collections import Iterable
 import copy
+from numbers import Number
 import operator
 import itertools
 from vector import Vector
@@ -17,59 +18,72 @@ class Stencil(StencilNode):
 
     _fields = ["op_tree"]
 
-    def __init__(self, op_tree, output, iteration_space):
+    def __init__(self, op_tree, output, iteration_space, primary_mesh=None):
         # iteration_space is an iterable of (low, high, stride), (low, high), or (high,) tuples
         self.op_tree = op_tree
         self.output = output
+        if not isinstance(iteration_space, StencilNode):
+            iteration_space = RectangularDomain(iteration_space)
         self.iteration_space = iteration_space
+        self.primary_mesh = primary_mesh or output
 
     def __deepcopy__(self, memo):
         return type(self)(
             copy.deepcopy(self.op_tree, memo),
             copy.deepcopy(self.output, memo),
-            copy.deepcopy(self.iteration_space, memo)
+            copy.deepcopy(self.iteration_space, memo),
+            copy.deepcopy(self.primary_mesh, memo)
         )
 
     def __hash__(self):
-        iteration_space = tuple(tuple(i) for i in self.iteration_space)
-        return hash((hash(self.op_tree), hash(self.output), hash(iteration_space)))
+        return hash((hash(self.op_tree), hash(self.output), hash(self.iteration_space), hash(self.primary_mesh)))
 
-class ScalingStencil(StencilNode):
+class DomainUnion(StencilNode):
+    _fields = ['domains']
 
-    _fields = ["op_tree"]
+    def __init__(self, domains):
+        self.domains = domains
 
-    def __init__(self, op_tree, output, iteration_space, source_offset, target_offset, scaling_factor):
-        self.op_tree = op_tree
-        self.output = output
-        self.iteration_space = iteration_space
-        self.source_offset = source_offset
-        self.target_offset = target_offset
-        self.scaling_factor = scaling_factor
+    def __and__(self, other):
+        if isinstance(other, RectangularDomain):
+            return DomainUnion(copy.deepcopy(self.domains) + [other])
+        if isinstance(other, DomainUnion):
+            return DomainUnion(copy.deepcopy(self.domains) + copy.deepcopy(other.domains))
+        return NotImplemented
 
-    def __deepcopy__(self, memo):
-        params = [
-            self.op_tree,
-            self.output,
-            self.iteration_space,
-            self.source_offset,
-            self.target_offset,
-            self.scaling_factor,
-        ]
-        return type(self)(*[copy.deepcopy(i, memo) for i in params])
+    __rand__ = __and__
 
     def __hash__(self):
-        params = [
-            self.op_tree,
-            self.output,
-            self.iteration_space,
-            self.source_offset,
-            self.target_offset,
-            self.scaling_factor,
-        ]
-        return hash(tuple(hash(param) for param in params))
-#
-# class Stencil(ScalingStencil):
-#     def __init__(self, op_tree, output, iteration_space):
+        return hash(tuple(hash(i) for i in self.domains))
+
+    def __deepcopy__(self, memo):
+        return type(self)(copy.deepcopy(self.domains, memo))
+
+    def __str__(self):
+        return " U ".join(str(i) for i in self.domains)
+
+class RectangularDomain(StencilNode):
+    def __init__(self, space):
+        lower, upper, stride = zip(*space)
+        self.lower = Vector(lower)
+        self.stride = Vector(stride)
+        self.upper = Vector(upper)
+
+    def __and__(self, other):
+        if not isinstance(other, RectangularDomain):
+            return NotImplemented
+        return DomainUnion([self, other])
+
+    __rand__ = __and__
+
+    def __hash__(self):
+        return hash((self.lower, self.stride, self.upper))
+
+    def __deepcopy__(self, memo):
+        return self
+
+    def __str__(self):
+        return "<{}, {}, {}>".format(self.lower, self.upper, self.stride)
 
 class StencilComponent(StencilNode):
     """
@@ -158,6 +172,9 @@ class StencilConstant(StencilNode):
     def __hash__(self):
         return hash(self.value)
 
+    def __nonzero__(self):
+        return bool(self.value)
+
 
 class WeightArray(StencilNode):
     """
@@ -168,7 +185,10 @@ class WeightArray(StencilNode):
     @property
     def indices(self):
         ranges = [range(i) for i in self.shape]
-        return (Vector(coords) for coords in itertools.product(*ranges))
+        return (
+            Vector(coords) for coords in itertools.product(*ranges)
+            if self[coords]
+        )
 
     @property
     def center(self):
@@ -245,6 +265,8 @@ class SparseWeightArray(StencilNode):
         """
         self.__weight_map = {}
         for coord, value in weight_map.items():
+            if not value:
+                continue
             self.__weight_map[Vector(coord)] = value if isinstance(value, StencilNode) else StencilConstant(value)
         #self.__weight_map = weight_map
         self.__key_value_pairs = tuple(self.__weight_map.items())

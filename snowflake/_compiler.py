@@ -2,8 +2,8 @@ import ast
 import functools
 import operator
 
-from compiler_nodes import ArrayIndex, IndexOp, IterationSpace, Block
-from nodes import StencilComponent, StencilConstant
+from compiler_nodes import ArrayIndex, IndexOp, IterationSpace, Block, Space, SpaceUnion
+from nodes import StencilComponent, StencilConstant, RectangularDomain
 from nodes import Stencil
 
 
@@ -49,8 +49,16 @@ class StencilCompiler(ast.NodeVisitor):
             ],
             value=body
         )
-        nested = IterationSpace(space=node.iteration_space, body=[assignment])
-        return nested
+        if isinstance(node.iteration_space, RectangularDomain):
+            domains = [node.iteration_space]
+        else:
+            domains = node.iteration_space.domains
+        return IterationSpace(
+            space=SpaceUnion(
+                [Space(domain.lower, domain.upper, domain.stride) for domain in domains]
+            ),
+            body=[assignment]
+        )
 
     def visit_ScalingStencil(self, node):
         #starting location
