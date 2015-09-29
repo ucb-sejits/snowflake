@@ -60,33 +60,33 @@ class StencilCompiler(ast.NodeVisitor):
             body=[assignment]
         )
 
-    def visit_ScalingStencil(self, node):
-        #starting location
-        target = ast.Name(id=self.index_name, ctx=ast.Load())
-
-        #shift for source ghost zone
-        target = ast.BinOp(target, ast.Sub(), self._tuple_to_ast(node.source_offset))
-
-        #multiply by scaling factor
-        target = ast.BinOp(target, ast.Mult(), self._tuple_to_ast(node.scaling_factor))
-
-        #shift for target ghost zone
-        target = ast.BinOp(target, ast.Add(), self._tuple_to_ast(node.target_offset))
-
-        body = self.visit(node.op_tree)
-        assignment = ast.Assign(
-            targets=[
-                ast.Subscript(
-                    value=ast.Name(id=node.output, ctx=ast.Load()),
-                    slice=ast.Index(target),
-                    ctx=ast.Store()
-                )
-            ],
-            value=body
-        )
-        nested = IterationSpace(space=node.iteration_space, body=[assignment])
-        return nested
-
+    # def visit_ScalingStencil(self, node):
+    #     #starting location
+    #     target = ast.Name(id=self.index_name, ctx=ast.Load())
+    #
+    #     #shift for source ghost zone
+    #     target = ast.BinOp(target, ast.Sub(), self._tuple_to_ast(node.source_offset))
+    #
+    #     #multiply by scaling factor
+    #     target = ast.BinOp(target, ast.Mult(), self._tuple_to_ast(node.scaling_factor))
+    #
+    #     #shift for target ghost zone
+    #     target = ast.BinOp(target, ast.Add(), self._tuple_to_ast(node.target_offset))
+    #
+    #     body = self.visit(node.op_tree)
+    #     assignment = ast.Assign(
+    #         targets=[
+    #             ast.Subscript(
+    #                 value=ast.Name(id=node.output, ctx=ast.Load()),
+    #                 slice=ast.Index(target),
+    #                 ctx=ast.Store()
+    #             )
+    #         ],
+    #         value=body
+    #     )
+    #     nested = IterationSpace(space=node.iteration_space, body=[assignment])
+    #     return nested
+    #
 
 
     def visit_StencilConstant(self, node):
@@ -221,7 +221,3 @@ def find_names(node):
             self.generic_visit(node)
     Visitor().visit(node)
     return names
-
-
-class Analyzer(object):
-    pass

@@ -84,5 +84,8 @@ class Vector(tuple):
     def __pos__(self):
         return self
 
+    def is_zero(self):
+        return not any(self)
+
     def __deepcopy__(self, memo):
         return type(self)(self)
