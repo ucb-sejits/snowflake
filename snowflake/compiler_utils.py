@@ -8,6 +8,7 @@ import functools
 
 import numpy as np
 import sympy
+from snowflake.compiler_nodes import IndexOp
 
 __author__ = 'nzhang-dev'
 
@@ -52,7 +53,7 @@ def sympy_to_ast(exp):
 
 def index_to_ast(index):
     elts = []
-    frame = ast.Tuple(elts=elts, ctx=ast.Load())
+    frame = IndexOp(elts)
 
     for component in index:
         if isinstance(component, int):

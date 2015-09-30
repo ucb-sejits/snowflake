@@ -1,6 +1,7 @@
 import ast
 import functools
 import operator
+import sympy
 
 from compiler_nodes import ArrayIndex, IndexOp, IterationSpace, Block, Space, SpaceUnion
 from nodes import StencilComponent, StencilConstant, RectangularDomain
@@ -20,8 +21,8 @@ class StencilCompiler(ast.NodeVisitor):
         operator.div: ast.Div()
     }
 
-    def __init__(self, index_name='index', ndim=0):
-        self.index_name = index_name
+    def __init__(self, ndim=0):
+        self.index_name = 'index'
         self.ndim = ndim
 
     def _tuple_to_ast(self, tuple):
@@ -78,7 +79,8 @@ class StencilCompiler(ast.NodeVisitor):
                             left=ast.Name(id=self.index_name, ctx=ast.Load()),
                             op=ast.Add(),
                             right=index_to_ast(vector)
-                        )
+                        ) if not any(isinstance(vi, sympy.Expr) for vi in vector) else index_to_ast(vector)
+                        # value=index_to_ast(vector)
                     ),
                     ctx=ast.Load()
                 ),

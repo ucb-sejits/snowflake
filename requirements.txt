@@ -1,4 +1,5 @@
 numpy
 sphinx
+sympy
 -e git+git://github.com/ucb-sejits/ctree@Rebox#egg=ctree
 -e git+git://github.com/ucb-sejits/Rebox@development#egg=Rebox

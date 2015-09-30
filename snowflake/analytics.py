@@ -25,10 +25,19 @@ def get_shadow(stencil):
 def analyze_dependencies(vec, space1, space2):
     x, y = sympy.symbols("x y", integer=True)  # used for setting up diophantine equations
     # s1x + o1 + v = s2y + o2
-    return [
-        dio.diophantine(s1 * x + o1 + v_comp - s2 * y - o2) for s1, o1, v_comp, s2, o2 in
-        zip(space1.stride, space1.lower, vec, space2.stride, space2.lower)
-    ]
+    # return [
+    #     dio.diophantine(s1 * x + o1 + v_comp - s2 * y - o2) for s1, o1, v_comp, s2, o2 in
+    #     zip(space1.stride, space1.lower, vec, space2.stride, space2.lower)
+    # ]
+
+    results = []
+    for dim, (s1, o1, v_comp, s2, o2) in enumerate(zip(space1.stride, space1.lower, vec, space2.stride, space2.lower)):
+        if isinstance(v_comp, sympy.Expr):
+            v_comp = v_comp.subs({'index_{}'.format(dim): s1*x})
+        results.append(
+            dio.diophantine(s1 * x + o1 + v_comp - s2 * y - o2)
+        )
+    return results
 
 def validate_stencil(stencil, _verbose=False):
     shadow = get_shadow(stencil)

@@ -14,6 +14,7 @@ setup(
     ],
 
     install_requires=[
+        'sympy',
         'numpy',
         'ctree',
         'rebox',

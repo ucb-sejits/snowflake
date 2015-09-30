@@ -41,8 +41,8 @@ class Compiler(object):
         v.visit(node)
         return v.ndim
 
-    def __init__(self, index_name="index"):
-        self.index_name = index_name
+    def __init__(self):
+        self.index_name = "index"
 
     def _compile(self, node, index_name, **kwargs):
         ndim = self.get_ndim(node)
@@ -52,7 +52,7 @@ class Compiler(object):
 
         node = copy.deepcopy(node)
         stack = [
-            StencilCompiler(index_name, ndim),
+            StencilCompiler(ndim),
             OpSimplifier(),
             ArrayOpRecognizer(index_name, ndim),
         ]
@@ -130,9 +130,9 @@ class PythonCompiler(Compiler):
                     op=ast.Sub()
                 )
             ]
-            if iter_range.stride is not None:
-                stride = iter_range.stride
-            elif 0 <= iter_range.low < iter_range.high or iter_range.high < 0 <= iter_range.low:
+            if iter_range[2] is not None:
+                stride = iter_range[2]
+            elif 0 <= iter_range[0] < iter_range[1] or iter_range[1] < 0 <= iter_range[0]:
                 stride = 1
             else:
                 stride = -1
@@ -144,33 +144,39 @@ class PythonCompiler(Compiler):
 
         def visit_IterationSpace(self, node):
             self.generic_visit(node)
-            nested = node.body
-            for dim, iteration_range in reversed(tuple(enumerate(node.space))):
-                nested = ast.For(
-                    target=ast.Name(id="{}_{}".format(self.index_name, dim), ctx=ast.Store()),
-                    iter=ast.Call(
-                        func=ast.Name(id="range", ctx=ast.Load()),
-                        args=self.get_range_args(iteration_range, dim),
-                        keywords=[],
-                        starargs=None,
-                        kwargs=None
-                    ),
-                    body=[nested] if not isinstance(nested, list) else nested,
-                    orelse=[]
-                )
-            return nested
+            parts = []
+            for space in node.space.spaces:
+                nested = node.body
+                for dim, iteration_range in reversed(tuple(enumerate(zip(*space)))):
+                    nested = ast.For(
+                        target=ast.Name(id="{}_{}".format(self.index_name, dim), ctx=ast.Store()),
+                        iter=ast.Call(
+                            func=ast.Name(id="range", ctx=ast.Load()),
+                            args=self.get_range_args(iteration_range, dim),
+                            keywords=[],
+                            starargs=None,
+                            kwargs=None
+                        ),
+                        body=[nested] if not isinstance(nested, list) else nested,
+                        orelse=[]
+                    )
+                parts.append(nested)
+            return parts
+
 
     def _post_process(self, original, compiled, index_name, **kwargs):
-        target_name = original.body[-1].output
+        target_names = [part.primary_mesh for part in original.body]
         #nodes = [self.IterationSpaceConverter(self.index_name).visit(node) for node in nodes]
         array_names = find_names(original)
         function_name = 'kernel'
         ndim = self.get_ndim(original)
-
-        args = [
-            target_name,
-        ]
-        args.extend(sorted(array_names - {target_name}))
+        body = []
+        for output_name, space in zip(target_names, compiled.body):
+            space = self.BasicIndexOpConverter().visit(space)
+            parts = self.IterationSpaceConverter(self.index_name, output_name).visit(space)
+            body.extend(parts)
+        args = [part.output for part in original.body]
+        args.extend(sorted(array_names - set(target_names)))
         tree = ast.FunctionDef(
             name=function_name,
             args=ast.arguments(
@@ -179,13 +185,13 @@ class PythonCompiler(Compiler):
                 kwarg=None,
                 defaults=[]
             ),
-            body=compiled.body,
+            body=body,
             decorator_list=[]
         )
         # print("hello")
         tree = ast.Module(body=[tree])
-        tree = self.BasicIndexOpConverter().visit(tree)
-        tree = self.IterationSpaceConverter(self.index_name, original.body[-1].output).visit(tree)
+        # tree = self.BasicIndexOpConverter().visit(tree)
+        # tree = self.IterationSpaceConverter(self.index_name, original.body[-1].output).visit(tree)
         tree = ast.fix_missing_locations(tree)
         code = compile(tree, '<string>', 'exec')
         exec code in globals(), locals()
@@ -199,8 +205,8 @@ class CCompiler(Compiler):
     def _shape_to_str(shape):
         return '_'.join(map(str, shape))
 
-    def __init__(self, *args):
-        super(CCompiler, self).__init__(*args)
+    def __init__(self):
+        super(CCompiler, self).__init__()
         self._lsk = None
 
     class BlockConverter(ast.NodeTransformer):
@@ -297,12 +303,12 @@ class CCompiler(Compiler):
 
 
     class LazySpecializedKernel(LazySpecializedFunction):
-        def __init__(self, py_ast=None, names=None, target_name='out', index_name='index',
+        def __init__(self, py_ast=None, names=None, target_names=('out',), index_name='index',
                      _hash=None):
             #print(dump(py_ast))
             self.__hash = _hash if _hash is not None else hash(py_ast)
             self.names = names
-            self.target_name = target_name
+            self.target_names = target_names
             self.index_name = index_name
 
             super(CCompiler.LazySpecializedKernel, self).__init__(py_ast, 'snowflake_' + hex(hash(self)))
@@ -310,10 +316,10 @@ class CCompiler(Compiler):
 
         @property
         def arg_spec(self):
-            return [self.target_name] + list(sorted(self.names - {self.target_name}))
+            return self.target_names + list(sorted(self.names - set(self.target_names)))
 
         def __hash__(self):
-            return self.__hash + hash((self.target_name, self.index_name))
+            return self.__hash + hash((tuple(self.target_names), self.index_name))
 
         class Subconfig(OrderedDict):
             def __hash__(self):
@@ -331,11 +337,28 @@ class CCompiler(Compiler):
             name_shape_map = {name: arg.shape for name, arg in subconfig.items()}
             shapes = set(name_shape_map.values())
             CCompiler.IndexOpToEncode(name_shape_map).visit(tree)
-            ndim = subconfig[self.target_name].ndim
+            ndim = subconfig[self.target_names[0]].ndim
             encode_funcs = []
             c_tree = PyBasicConversions().visit(tree)
+            # print(dump(c_tree))
             for shape in shapes:
                 encode_funcs.append(generate_encode_macro('encode'+CCompiler._shape_to_str(shape), shape))
+            # c_func = FunctionDecl(
+            #     name=SymbolRef("kernel"),
+            #     params=[
+            #         SymbolRef(name=arg_name, sym_type=get_ctype(
+            #             arg if not isinstance(arg, np.ndarray) else arg.ravel()
+            #         ), _restrict=True) for arg_name, arg in subconfig.items()
+            #     ],
+            #     defn=[c_tree]
+            # )
+            components = []
+            for target, ispace in zip(self.target_names, c_tree.body):
+                shape = subconfig[target].shape
+                sub = CCompiler.IterationSpaceExpander(self.index_name, shape).visit(ispace)
+                sub = CCompiler.BlockConverter().visit(sub)
+                components.append(sub)
+
             c_func = FunctionDecl(
                 name=SymbolRef("kernel"),
                 params=[
@@ -343,14 +366,8 @@ class CCompiler(Compiler):
                         arg if not isinstance(arg, np.ndarray) else arg.ravel()
                     ), _restrict=True) for arg_name, arg in subconfig.items()
                 ],
-                defn=[c_tree]
+                defn=components
             )
-            if len(self.arg_spec) > 1:
-                shape = subconfig[self.arg_spec[1]].shape
-            else:
-                shape = subconfig[self.arg_spec[0]].shape
-            c_func = CCompiler.IterationSpaceExpander(self.index_name, shape).visit(c_func)
-            c_func = CCompiler.BlockConverter().visit(c_func)
             # print(c_func)
             # print(encode_func)
             includes = [
@@ -358,6 +375,7 @@ class CCompiler(Compiler):
             ]
             out_file = CFile(body=includes + encode_funcs + [c_func])
             # print(dump(out_file))
+
             return out_file
 
 
@@ -378,10 +396,11 @@ class CCompiler(Compiler):
 
     def _post_process(self, original, compiled, index_name, **kwargs):
         #print(hash(original))
+        # print(dump(compiled))
         return self.LazySpecializedKernel(
             py_ast=compiled,
             names=find_names(original),
             index_name=index_name,
-            target_name=original.body[-1].primary_mesh,
+            target_names=[stencil.primary_mesh for stencil in original.body],
             _hash=hash(original)
         )
