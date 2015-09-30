@@ -53,3 +53,14 @@ def validate_stencil(stencil, _verbose=False):
             if all(analysis):
                 return False
     return True
+
+
+def _getdata(a):
+    return a.__array_interface__['data'][0], a.nbytes
+
+def array_collision(a, b):
+    a_low, a_len = _getdata(a)
+    b_low, b_len = _getdata(b)
+    a_high = a_low + a_len
+    b_high = b_low + b_len
+    return a_low <= b_low <= a_high or a_low <= b_high <= a_high

@@ -4,6 +4,8 @@ import operator
 import itertools
 from utils import partition, shell
 
+import sympy
+
 __author__ = 'nzhang-dev'
 
 
@@ -11,6 +13,10 @@ class Vector(tuple):
     """
     A Vector that supports arithmetic. These can be used for numpy indicies and has neighborhood utility functions.
     """
+
+    @classmethod
+    def index_vector(cls, ndim, name='index'):
+        return cls((sympy.Symbol('{}_{}'.format(name, i)) for i in range(ndim)))
 
     @classmethod
     def unit_vector(cls, dim, ndim):

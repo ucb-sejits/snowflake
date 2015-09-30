@@ -44,14 +44,14 @@ class DomainUnion(StencilNode):
     def __init__(self, domains):
         self.domains = domains
 
-    def __and__(self, other):
+    def __add__(self, other):
         if isinstance(other, RectangularDomain):
             return DomainUnion(copy.deepcopy(self.domains) + [other])
         if isinstance(other, DomainUnion):
             return DomainUnion(copy.deepcopy(self.domains) + copy.deepcopy(other.domains))
         return NotImplemented
 
-    __rand__ = __and__
+    __radd__ = __add__
 
     def __hash__(self):
         return hash(tuple(hash(i) for i in self.domains))
@@ -69,12 +69,12 @@ class RectangularDomain(StencilNode):
         self.stride = Vector(stride)
         self.upper = Vector(upper)
 
-    def __and__(self, other):
+    def __add__(self, other):
         if not isinstance(other, RectangularDomain):
             return NotImplemented
         return DomainUnion([self, other])
 
-    __rand__ = __and__
+    __radd__ = __add__
 
     def __hash__(self):
         return hash((self.lower, self.stride, self.upper))
