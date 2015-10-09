@@ -2,7 +2,7 @@
 new eDSL for stencils in python
 
 ## What is a stencil?
-Stencils are neighborhood operations defined over a grid. For example, a 1-D neighborhood average might look like $\text{Out}[x] = \frac{1}{4} \text{In}[x-1] + \frac{1}{2} \text{In}[x] + \frac{1}{4} \text{In}[x+1]$. Traditionally, these constructs have been expressed through the use of loops.
+Stencils are neighborhood operations defined over a grid. For example, a 1-D neighborhood average might look like Out[x] = 1/4 In[x-1] + 1/2 In[x] + 1/4 In[x+1]. Traditionally, these constructs have been expressed through the use of loops.
 
 ```py
 def linear_avg(arr):
