@@ -5,6 +5,9 @@ from collections import Iterable, OrderedDict
 import copy
 import ctypes
 import itertools
+import os
+import re
+import ctree
 from ctree.c.nodes import String, FunctionCall, SymbolRef, FunctionDecl, For, Constant, Assign, Lt, AugAssign, AddAssign, \
     CFile, Sub, ArrayRef, MultiNode, Mul, Add, LtE, TernaryOp, And
 from ctree.cpp.nodes import CppInclude
@@ -269,7 +272,6 @@ class CCompiler(Compiler):
 
     class ConcreteSpecializedKernel(ConcreteSpecializedFunction):
         def finalize(self, entry_point_name, project_node, entry_point_typesig):
-        #print("SmoothCFunction Finalize", entry_point_name)
             self._c_function = self._compile(entry_point_name, project_node, entry_point_typesig)
             self.entry_point_name = entry_point_name
             return self
@@ -282,7 +284,6 @@ class CCompiler(Compiler):
     class LazySpecializedKernel(LazySpecializedFunction):
         def __init__(self, py_ast=None, names=None, target_names=('out',), index_name='index',
                      _hash=None):
-            #print(dump(py_ast))
             self.__hash = _hash if _hash is not None else hash(py_ast)
             self.names = names
             self.target_names = target_names
@@ -291,10 +292,27 @@ class CCompiler(Compiler):
             super(CCompiler.LazySpecializedKernel, self).__init__(py_ast, 'snowflake_' + hex(hash(self)))
             self.parent_cls = CCompiler
 
+        def config_to_dirname(self, program_config):
+            """
+            Much stripped down version
+            """
+            regex_filter = re.compile(r"""[/\?%*:|"<>()'{} -]""")
+
+            path_parts = [
+                'snowflake',
+                str(self._hash(program_config.args_subconfig)),
+                str(self._hash(program_config.tuner_subconfig)),
+                str(type(self).__name__)
+                ]
+            path_parts = [re.sub(regex_filter, '_', part) for part in path_parts]
+            compile_path = str(ctree.CONFIG.get('jit', 'COMPILE_PATH'))
+            path = os.path.join(compile_path, *path_parts)
+            final = re.sub('_+', '_', path)
+            return final
 
         @property
         def arg_spec(self):
-            return list(set(self.target_names)) + list(sorted(set(self.names) - set(self.target_names)))
+            return tuple(list(set(self.target_names)) + list(sorted(set(self.names) - set(self.target_names))))
 
         def __hash__(self):
             return self.__hash + hash((tuple(self.target_names), self.index_name))
@@ -364,9 +382,6 @@ class CCompiler(Compiler):
             )
 
     def _post_process(self, original, compiled, index_name, **kwargs):
-        #print(hash(original))
-        # print(dump(compiled))
-        # print(len(original.body))
         return self.LazySpecializedKernel(
             py_ast=compiled,
             names=find_names(original),
