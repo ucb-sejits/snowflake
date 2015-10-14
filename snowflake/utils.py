@@ -1,3 +1,6 @@
+import ast
+import copy
+
 __author__ = 'nzhang-dev'
 
 def partition(n, k):
@@ -42,3 +45,17 @@ def _shell(n, k, fulfilled=False):
     for i in (-n, n):
         for s in _shell(n, k-1, True):
             yield (i,) + s
+
+
+def swap_variables(node, swap_map, **kwargs):
+    swap_map.update(kwargs)
+    class VariableSwapper(ast.NodeTransformer):
+        def visit_StencilComponent(self, node):
+            node.name = swap_map.get(node.name, node.name)
+            return self.generic_visit(node)
+
+        def visit_Stencil(self, node):
+            node.output = swap_map.get(node.output, node.output)
+            node.primary_mesh = swap_map.get(node.primary_mesh, node.primary_mesh)
+            return self.generic_visit(node)
+    return VariableSwapper().visit(copy.deepcopy(node))

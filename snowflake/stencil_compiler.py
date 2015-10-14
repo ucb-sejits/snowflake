@@ -267,30 +267,6 @@ class CCompiler(Compiler):
                 parts.extend(inside)
             return MultiNode(parts)
 
-    class TiledIterationSpaceExpander(ast.NodeTransformer):
-        def __init__(self, index_name, reference_array_shape, block_size=(64, 64)):
-            self.index_name = index_name
-            self.reference_array_shape = reference_array_shape
-            self.block_size = block_size
-
-
-        def visit_IterationSpace(self, node):
-            node = self.generic_visit(node)
-            inside = node.body
-            make_low = lambda low, dim: Constant(low) if low >= 0 else Constant(self.reference_array_shape[dim] + low)
-            make_high = lambda high, dim: Constant(high) if high > 0 else Constant(self.reference_array_shape[dim] + high)
-            for dim, iteration_range in reversed(list(enumerate(node.space))):
-
-                inside = [
-                    For(
-                        init=Assign(SymbolRef("{}_{}".format(self.index_name, dim)), make_low(iteration_range.low, dim)),
-                        test=Lt(SymbolRef("{}_{}".format(self.index_name, dim)), make_high(iteration_range.high, dim)),
-                        incr=AddAssign(SymbolRef("{}_{}".format(self.index_name, dim)), Constant(iteration_range.stride or 1)),
-                        body=inside
-                    )
-                ]
-            return inside[0]
-
     class ConcreteSpecializedKernel(ConcreteSpecializedFunction):
         def finalize(self, entry_point_name, project_node, entry_point_typesig):
         #print("SmoothCFunction Finalize", entry_point_name)
@@ -299,7 +275,8 @@ class CCompiler(Compiler):
             return self
 
         def __call__(self, *args, **kwargs):
-            return self._c_function(*args)
+            res = self._c_function(*args)
+            return res
 
 
     class LazySpecializedKernel(LazySpecializedFunction):
@@ -312,11 +289,12 @@ class CCompiler(Compiler):
             self.index_name = index_name
 
             super(CCompiler.LazySpecializedKernel, self).__init__(py_ast, 'snowflake_' + hex(hash(self)))
+            self.parent_cls = CCompiler
 
 
         @property
         def arg_spec(self):
-            return self.target_names + list(sorted(self.names - set(self.target_names)))
+            return list(set(self.target_names)) + list(sorted(set(self.names) - set(self.target_names)))
 
         def __hash__(self):
             return self.__hash + hash((tuple(self.target_names), self.index_name))
@@ -336,27 +314,17 @@ class CCompiler(Compiler):
             subconfig, tuning_config = program_config
             name_shape_map = {name: arg.shape for name, arg in subconfig.items()}
             shapes = set(name_shape_map.values())
-            CCompiler.IndexOpToEncode(name_shape_map).visit(tree)
-            ndim = subconfig[self.target_names[0]].ndim
+            self.parent_cls.IndexOpToEncode(name_shape_map).visit(tree)
             encode_funcs = []
             c_tree = PyBasicConversions().visit(tree)
             # print(dump(c_tree))
             for shape in shapes:
                 encode_funcs.append(generate_encode_macro('encode'+CCompiler._shape_to_str(shape), shape))
-            # c_func = FunctionDecl(
-            #     name=SymbolRef("kernel"),
-            #     params=[
-            #         SymbolRef(name=arg_name, sym_type=get_ctype(
-            #             arg if not isinstance(arg, np.ndarray) else arg.ravel()
-            #         ), _restrict=True) for arg_name, arg in subconfig.items()
-            #     ],
-            #     defn=[c_tree]
-            # )
             components = []
             for target, ispace in zip(self.target_names, c_tree.body):
                 shape = subconfig[target].shape
-                sub = CCompiler.IterationSpaceExpander(self.index_name, shape).visit(ispace)
-                sub = CCompiler.BlockConverter().visit(sub)
+                sub = self.parent_cls.IterationSpaceExpander(self.index_name, shape).visit(ispace)
+                sub = self.parent_cls.BlockConverter().visit(sub)
                 components.append(sub)
 
             c_func = FunctionDecl(
@@ -374,6 +342,7 @@ class CCompiler(Compiler):
                 CppInclude("stdint.h")
             ]
             out_file = CFile(body=includes + encode_funcs + [c_func])
+            # print(out_file)
             # print(dump(out_file))
 
             return out_file
@@ -397,10 +366,11 @@ class CCompiler(Compiler):
     def _post_process(self, original, compiled, index_name, **kwargs):
         #print(hash(original))
         # print(dump(compiled))
+        # print(len(original.body))
         return self.LazySpecializedKernel(
             py_ast=compiled,
             names=find_names(original),
             index_name=index_name,
-            target_names=[stencil.primary_mesh for stencil in original.body],
+            target_names=[stencil.primary_mesh for stencil in original.body if hasattr(stencil, "primary_mesh")],
             _hash=hash(original)
         )

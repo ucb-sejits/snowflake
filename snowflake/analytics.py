@@ -13,6 +13,9 @@ from snowflake.vector import Vector
 
 __author__ = 'nzhang-dev'
 
+class AnalysisError(Exception):
+    pass
+
 
 def get_shadow(stencil):
     shadows = defaultdict(set)

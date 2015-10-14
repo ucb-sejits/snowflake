@@ -371,22 +371,3 @@ class StencilGroup(StencilNode):
 
     def __hash__(self):
         return hash(tuple(hash(i) for i in self.body))
-
-class VariableUpdate(StencilNode):
-    _fields = ['sources', 'targets']
-
-    def __init__(self, updates=None, **kwargs):
-        if updates:
-            kwargs.update(updates)
-        self.updates = kwargs
-
-    @property
-    def sources(self):
-        return self.updates.values()
-
-    @property
-    def targets(self):
-        return self.updates.keys()
-
-    def __deepcopy__(self, memo):
-        return VariableUpdate(self.updates)

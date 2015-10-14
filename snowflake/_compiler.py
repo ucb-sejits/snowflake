@@ -33,11 +33,6 @@ class StencilCompiler(ast.NodeVisitor):
     def visit_StencilGroup(self, node):
         return Block([self.visit(i) for i in node.body])
 
-    def visit_VariableUpdate(self, node):
-        sources = ast.Tuple(elts=[ast.Name(id=name, ctx=ast.Load()) for name in node.sources], ctx=ast.Load())
-        targets = ast.Tuple(elts=[ast.Name(id=name, ctx=ast.Store()) for name in node.targets], ctx=ast.Store())
-        return ast.Assign(targets=[targets], value=sources)
-
 
     def visit_Stencil(self, node):
         body = self.visit(node.op_tree)
@@ -86,8 +81,10 @@ class StencilCompiler(ast.NodeVisitor):
                 ),
                 op=ast.Mult(),
                 right=weight
-            ) for weight, vector in zip(weights, node.weights.vectors)
-            if (not isinstance(weight, StencilConstant)) or weight.value != 0
+            ) for weight, vector in zip(
+                [weight for weight in weights if (not isinstance(weight, ast.Num)) or weight.n != 0],
+                node.weights.vectors
+            )
         ]
         if not components:  # we filtered all of it out
             return ast.Num(n=0)
