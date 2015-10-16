@@ -244,7 +244,7 @@ class CCompiler(Compiler):
             return self.visit_IndexOp(node)
 
     class IterationSpaceExpander(ast.NodeTransformer):
-        def __init__(self, index_name, reference_array_shape, block_size=(64, 64)):
+        def __init__(self, index_name, reference_array_shape, block_size=(512, 512)):
             self.index_name = index_name
             self.reference_array_shape = reference_array_shape
             self.block_size = block_size
@@ -302,7 +302,7 @@ class CCompiler(Compiler):
                 'snowflake',
                 str(self._hash(program_config.args_subconfig)),
                 str(self._hash(program_config.tuner_subconfig)),
-                str(type(self).__name__)
+                str(self.parent_cls.__name__)
                 ]
             path_parts = [re.sub(regex_filter, '_', part) for part in path_parts]
             compile_path = str(ctree.CONFIG.get('jit', 'COMPILE_PATH'))
@@ -354,14 +354,10 @@ class CCompiler(Compiler):
                 ],
                 defn=components
             )
-            # print(c_func)
-            # print(encode_func)
             includes = [
                 CppInclude("stdint.h")
             ]
             out_file = CFile(body=includes + encode_funcs + [c_func])
-            # print(out_file)
-            # print(dump(out_file))
 
             return out_file
 
