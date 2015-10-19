@@ -1,29 +1,23 @@
 from __future__ import division
-import abc
 import ast
-from collections import Iterable, OrderedDict
+from collections import OrderedDict
 import copy
 import ctypes
-import itertools
 import os
 import re
 import ctree
-from ctree.c.nodes import String, FunctionCall, SymbolRef, FunctionDecl, For, Constant, Assign, Lt, AugAssign, AddAssign, \
-    CFile, Sub, ArrayRef, MultiNode, Mul, Add, LtE, TernaryOp, And
+from ctree.c.nodes import SymbolRef, FunctionDecl, For, Constant, Assign, Lt, AddAssign, \
+    CFile, MultiNode
 from ctree.cpp.nodes import CppInclude
 from ctree.jit import LazySpecializedFunction, ConcreteSpecializedFunction
 from ctree.nodes import Project
 from ctree.transformations import PyBasicConversions
-from ctree.frontend import dump
-import math
 from ctree.types import get_ctype
-from rebox.specializers.order import Ordering
 from _compiler import StencilCompiler, find_names, ArrayOpRecognizer, OpSimplifier
-from nodes import WeightArray, SparseWeightArray, Stencil, StencilGroup
+from nodes import StencilGroup
 
 import numpy as np
 
-from rebox.specializers.rm.encode import MultiplyEncode
 from snowflake.compiler_utils import generate_encode_macro
 
 __author__ = 'nzhang-dev'
