@@ -81,8 +81,14 @@ class Vector(tuple):
     def __div__(self, other):
         return Vector.__apply(self, other, operator.div)
 
+    def __truediv__(self, other):
+        return Vector.__apply(self, other, operator.truediv)
+
+    def __floordiv__(self, other):
+        return Vector.__apply(self, other, operator.floordiv)
+
     def __rdiv__(self, other):
-        return Vector.apply(other, self, operator.div)
+        return Vector.__apply(other, self, operator.div)
 
     def __neg__(self):
         return -1 * self

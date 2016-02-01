@@ -46,7 +46,6 @@ def _shell(n, k, fulfilled=False):
         for s in _shell(n, k-1, True):
             yield (i,) + s
 
-
 def swap_variables(node, swap_map, **kwargs):
     swap_map.update(kwargs)
     class VariableSwapper(ast.NodeTransformer):

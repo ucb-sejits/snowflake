@@ -3,7 +3,7 @@ import functools
 import operator
 import sympy
 
-from compiler_nodes import ArrayIndex, IndexOp, IterationSpace, Block, Space, SpaceUnion
+from compiler_nodes import ArrayIndex, IndexOp, IterationSpace, Block, Space, NDSpace
 from nodes import StencilComponent, StencilConstant, RectangularDomain
 from nodes import Stencil
 from snowflake.compiler_utils import index_to_ast
@@ -51,7 +51,7 @@ class StencilCompiler(ast.NodeVisitor):
         else:
             domains = node.iteration_space.domains
         return IterationSpace(
-            space=SpaceUnion(
+            space=NDSpace(
                 [Space(domain.lower, domain.upper, domain.stride) for domain in domains]
             ),
             body=[assignment]

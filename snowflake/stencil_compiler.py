@@ -18,11 +18,28 @@ from nodes import StencilGroup
 
 import numpy as np
 
-from snowflake.compiler_utils import generate_encode_macro
+from snowflake.compiler_utils import generate_encode_macro, fill_iteration_spaces
+from snowflake.optimizations import OptimizationLevels
 
 __author__ = 'nzhang-dev'
 
+class OptimizationList(object):
+    """Defines a list of optimizations to be run."""
+
+    def __init__(self, optimization_list=()):
+        if not optimization_list:
+            pass
+        if not all(a.optimization_level <= b.optimization_level for a,b in zip(optimization_list[:-1], optimization_list[1:])):
+            raise TypeError("Optimizations must be in order")
+        self.optimization_groups = {
+            optimizationlevel: [opt for opt in optimization_list if opt.optimization_level == optimizationlevel]
+            for optimizationlevel in OptimizationLevels.choices
+        }
+
+
 class Compiler(object):
+
+    optimizations = OptimizationList()
 
     @staticmethod
     def get_ndim(node):
@@ -238,11 +255,9 @@ class CCompiler(Compiler):
             return self.visit_IndexOp(node)
 
     class IterationSpaceExpander(ast.NodeTransformer):
-        def __init__(self, index_name, reference_array_shape, block_size=(512, 512)):
+        def __init__(self, index_name, reference_array_shape):
             self.index_name = index_name
             self.reference_array_shape = reference_array_shape
-            self.block_size = block_size
-
 
         def visit_IterationSpace(self, node):
             node = self.generic_visit(node)
@@ -252,7 +267,7 @@ class CCompiler(Compiler):
             parts = []
             for space in node.space.spaces:
                 inside = node.body
-                for dim, iteration_range in reversed(list(enumerate(zip(*space)))):
+                for dim, iteration_range in reversed(list(enumerate(zip(*[space.low, space.high, space.stride])))):
                     inside = [
                         For(
                             init=Assign(SymbolRef("{}_{}".format(self.index_name, dim)), make_low(iteration_range[0], dim)),
@@ -335,7 +350,8 @@ class CCompiler(Compiler):
             components = []
             for target, ispace in zip(self.target_names, c_tree.body):
                 shape = subconfig[target].shape
-                sub = self.parent_cls.IterationSpaceExpander(self.index_name, shape).visit(ispace)
+                sub = fill_iteration_spaces(ispace, shape)
+                sub = self.parent_cls.IterationSpaceExpander(self.index_name, shape).visit(sub)
                 sub = self.parent_cls.BlockConverter().visit(sub)
                 components.append(sub)
 

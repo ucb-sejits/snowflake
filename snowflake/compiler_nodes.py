@@ -5,17 +5,26 @@ __author__ = 'nzhang-dev'
 
 import ast
 
-Space = namedtuple("Space", ['low', 'high', 'stride'])
-
 class StencilCompilerNode(ast.AST):
     """
     Generic Parent class or Stencil Nodes
     """
 
+    def __init__(self, *args, **kwargs):
+        if args and kwargs:
+            raise ValueError("Pass either args or kwargs")
+        iterable = zip(self._fields, args) if args else kwargs.items()
+        for key, value in iterable:
+            setattr(self, key, value)
+
 
     def __deepcopy__(self, memo):
         print('Copying: ' + str(type(self).__name__))
         raise NotImplementedError("{} does not have __deepcopy__ implemented".format(type(self).__name__))
+
+    def _default_deepcopy(self, memo):
+        attribs = [copy.deepcopy(getattr(self, name), memo) for name in self._fields]
+        return type(self)(*attribs)
 
 
 class IndexOp(StencilCompilerNode):
@@ -67,10 +76,10 @@ class IterationSpace(StencilCompilerNode):
     Semantic node for the space over which a snowflake is applied.
     """
     _fields = ['space', 'body']
-
-    def __init__(self, space, body):
-        self.space = space
-        self.body = body
+    #
+    # def __init__(self, space, body):
+    #     self.space = space
+    #     self.body = body
 
     def __deepcopy__(self, memo):
         return type(self)(
@@ -78,19 +87,34 @@ class IterationSpace(StencilCompilerNode):
             copy.deepcopy(self.body, memo=memo)
         )
 
-class SpaceUnion(StencilCompilerNode):
+class NDSpace(StencilCompilerNode):
 
     _fields = ['spaces']
-    def __init__(self, spaces):
-        self.spaces = spaces
+    # def __init__(self, spaces):
+    #     self.spaces = spaces
 
     def __deepcopy__(self, memo):
-        return SpaceUnion(copy.deepcopy(self.spaces, memo))
+        return NDSpace(copy.deepcopy(self.spaces, memo))
 
 class Block(StencilCompilerNode):
     _fields = ['body']
-    def __init__(self, body):
-        self.body = body
+    # def __init__(self, body):
+    #     self.body = body
 
     def __deepcopy__(self, memo):
         return type(self)(copy.deepcopy(self.body, memo))
+
+class Space(StencilCompilerNode):
+    _fields = ['low', 'high', 'stride']
+
+    __deepcopy__ = StencilCompilerNode._default_deepcopy
+
+
+class NestedSpace(StencilCompilerNode):
+    """
+    Used for tiling/blocking/iteration order manipulation. This frequently requires different/more complex code generation.
+    This node requires the space to have reified bounds
+    """
+    _fields = ['low', 'high', 'block_size', 'stride']
+
+    __deepcopy__ = StencilCompilerNode._default_deepcopy
