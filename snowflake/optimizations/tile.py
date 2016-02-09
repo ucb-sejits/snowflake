@@ -61,6 +61,7 @@ class TilingOptimization(Optimization):
                     # for (int i_inner = 0; i_inner < block_size; i_inner += stride)
 
                     cur_node.init.left = SymbolRef(name=index_name+"_inner", sym_type=cur_node.init.left.type)
+                    cur_node.init.right = Constant(0)
                     cur_node.test.left = SymbolRef(name=index_name+"_inner")
                     cur_node.test.right = Constant(block_size)
                     cur_node.incr.target = SymbolRef(name=index_name+"_inner")
