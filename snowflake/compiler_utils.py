@@ -133,3 +133,37 @@ class StencilShifter(ast.NodeTransformer):
         node.args = [Add(arg, Constant(offset)) for arg, offset in zip(node.args, self.offset)]
         # print(node)
         return node
+
+def create_block_combiner():
+    BLOCK_TYPES = {
+        'For': 'body',
+        'FunctionDecl': 'defn',
+        'MultiNode': 'body'
+    }
+
+    FUSIBLE_TYPES = {
+        'MultiNode': 'body'
+    }
+
+    def make_func(name, attr):
+        def visit_method(self, node):
+            output = []
+            if not getattr(node, attr):
+                return node
+            for child in getattr(node, attr):
+                if child.__class__.__name__ in FUSIBLE_TYPES:
+                    child = self.visit(child)
+                    output.extend(getattr(child, FUSIBLE_TYPES[child.__class__.__name__]))
+                else:
+                    output.append(child)
+            setattr(node, attr, output)
+            return node
+
+    return type(
+        "BlockCombineTransformer", (ast.NodeTransformer,), {
+            'visit_{}'.format(block_type) : make_func(block_type, attrib) for block_type, attrib in BLOCK_TYPES.items()
+        }
+    )
+
+BlockCombineTransformer = create_block_combiner()
+del create_block_combiner
