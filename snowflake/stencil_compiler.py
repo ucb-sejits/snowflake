@@ -12,6 +12,7 @@ from ctree.cpp.nodes import CppInclude
 from ctree.jit import LazySpecializedFunction, ConcreteSpecializedFunction
 from ctree.nodes import Project
 from ctree.transformations import PyBasicConversions
+from ctree.transforms import DeclarationFiller
 from ctree.types import get_ctype
 from _compiler import StencilCompiler, find_names, ArrayOpRecognizer, OpSimplifier
 from nodes import StencilGroup
@@ -20,6 +21,7 @@ import numpy as np
 
 from snowflake.compiler_utils import generate_encode_macro, fill_iteration_spaces
 from snowflake.optimizations import OptimizationLevels
+from snowflake.optimizations.tile import TilingOptimization
 
 __author__ = 'nzhang-dev'
 
@@ -39,8 +41,6 @@ class OptimizationList(object):
 
 class Compiler(object):
 
-    optimizations = OptimizationList()
-
     @staticmethod
     def get_ndim(node):
         class Visitor(ast.NodeVisitor):
@@ -55,8 +55,9 @@ class Compiler(object):
         v.visit(node)
         return v.ndim
 
-    def __init__(self):
+    def __init__(self, optimizations=()):
         self.index_name = "index"
+        self.optimizations = OptimizationList(optimizations)
 
     def _compile(self, node, index_name, **kwargs):
         ndim = self.get_ndim(node)
@@ -87,6 +88,17 @@ class Compiler(object):
         processed = self._post_process(copied, compiled, self.index_name, **kwargs)
         return processed
 
+    class SpecializationKernel(LazySpecializedFunction):
+        def get_program_config(self, args, kwargs):
+            # Don't break old specializers that don't support kwargs
+            args_subconfig = self.args_to_subconfig(args)
+            try:
+                self._tuner.configs.send((args, args_subconfig))
+            except TypeError:
+                "Can't send into an unstarted generator"
+                pass
+            tuner_subconfig = next(self._tuner.configs)
+            return self.ProgramConfig(args_subconfig, tuner_subconfig)
 
 class PythonCompiler(Compiler):
 
@@ -161,7 +173,7 @@ class PythonCompiler(Compiler):
             parts = []
             for space in node.space.spaces:
                 nested = node.body
-                for dim, iteration_range in reversed(tuple(enumerate(zip(*space)))):
+                for dim, iteration_range in reversed(tuple(enumerate(zip(space.low, space.high, space.stride)))):
                     nested = ast.For(
                         target=ast.Name(id="{}_{}".format(self.index_name, dim), ctx=ast.Store()),
                         iter=ast.Call(
@@ -289,8 +301,7 @@ class CCompiler(Compiler):
             res = self._c_function(*args)
             return res
 
-
-    class LazySpecializedKernel(LazySpecializedFunction):
+    class LazySpecializedKernel(Compiler.SpecializationKernel):
         def __init__(self, py_ast=None, names=None, target_names=('out',), index_name='index',
                      _hash=None):
             self.__hash = _hash if _hash is not None else hash(py_ast)
@@ -364,11 +375,11 @@ class CCompiler(Compiler):
                 ],
                 defn=components
             )
+            TilingOptimization().optimize(c_func, (16, 16))
             includes = [
                 CppInclude("stdint.h")
             ]
             out_file = CFile(body=includes + encode_funcs + [c_func])
-
             return out_file
 
 

@@ -189,3 +189,6 @@ def find_names(node):
             self.generic_visit(node)
     Visitor().visit(node)
     return names
+
+def report_to(cls):
+    pass

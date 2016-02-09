@@ -1,3 +1,4 @@
+import copy
 import ctypes
 import functools
 import operator
@@ -10,6 +11,7 @@ import functools
 import numpy as np
 import sympy
 from snowflake.compiler_nodes import IndexOp, Space, NDSpace
+from snowflake.nodes import SparseWeightArray
 from snowflake.vector import Vector
 
 __author__ = 'nzhang-dev'
@@ -77,19 +79,14 @@ def fill_iteration_spaces(node, shape):
             node.high = Vector(
                 [i + size if i <= 0 else i for i, size in zip(node.high, shape)]
             )
+
+            # now we clip the high to fit perfectly. For example, 1 to 10 by 3 should really be just 1, 4, 7 (so 1 to 8)
+            # so really the upper bound should be upper - ((upper - lower - 1) % stride)
+            node.high = Vector(
+                [h - ((h - l) % s) for h, l, s in zip(node.high, node.low, node.stride)]
+            )
             return node
 
-            # new_spaces = []
-            # for space, size in zip(node.spaces, shape):
-            #     low, high, stride = space
-            #     if low < 0:  # low = 0 means start at bottom, low = -1 means start at top
-            #         low = size + low
-            #
-            #     if high < 0:  # high = 0 means end at top
-            #         high = size + high
-            #
-            #     new_spaces.append(Space(low, high, stride))
-            # return NDSpace(new_spaces)
     return IterationSpaceFiller().visit(node)
 
 
@@ -102,3 +99,37 @@ def calculate_ND_volume(ndspace):
         total_volume *= space.high - space.low
         strided_volume *= (space.high - space.low) // space.stride
     return functools.reduce(operator.mul, total_volume), functools.reduce(operator.mul, strided_volume)
+
+def is_homogenous_space(ndspace):
+    if not ndspace.spaces:
+        raise ValueError("Empty spaces are not allowed")
+    if any(space.stride != ndspace.spaces[0].stride for space in ndspace.spaces):
+        return False
+
+    #offsets in each dimension must be less than stride apart for start and end
+    low_low = ndspace.spaces[0].low
+    low_high = ndspace.spaces[0].low
+    high_low = ndspace.spaces[0].high
+    high_high = ndspace.spaces[0].high
+    strides = ndspace.spaces[0].stride
+    for space in ndspace.spaces:
+        low_low = tuple(min(i, j) for i, j in zip(low_low, space.low))
+        low_high = tuple(max(i, j) for i, j in zip(low_high, space.low))
+        high_low = tuple(min(i, j) for i, j in zip(high_low, space.high))
+        high_high = tuple(max(i, j) for i, j in zip(high_high, space.high))
+    return all(
+        all((high - low) <= stride for stride, low, high in zip(strides, low, high))
+        for low, high in ((low_low, low_high), (high_low, high_high))
+    )
+
+class StencilShifter(ast.NodeTransformer):
+    def __init__(self, offset):
+        self.offset = offset
+
+    def visit_FunctionCall(self, node):
+        if not node.func.name.startswith("encode"):
+            return self.generic_visit(node)
+        node = copy.deepcopy(node)
+        node.args = [Add(arg, Constant(offset)) for arg, offset in zip(node.args, self.offset)]
+        # print(node)
+        return node

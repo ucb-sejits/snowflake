@@ -8,17 +8,10 @@ __author__ = 'nzhang-dev'
 class Optimization(object):
     optimization_level = -1 # undefined
 
-    @abc.abstractproperty
-    def tuning_driver(self):
+    @abc.abstractmethod
+    def get_tuning_driver(self, shape):
         pass
 
     @abc.abstractmethod
-    def optimize(self, tree):
+    def optimize(self, tree, params):
         pass
-
-
-class StencilOptimization(Optimization):
-    """Optimizations that happen at the Stencil level"""
-
-class CompilerOptimization(Optimization):
-    """Optimizations that happen at the CompilerNode level"""

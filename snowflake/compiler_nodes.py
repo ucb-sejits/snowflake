@@ -96,6 +96,12 @@ class NDSpace(StencilCompilerNode):
     def __deepcopy__(self, memo):
         return NDSpace(copy.deepcopy(self.spaces, memo))
 
+    @property
+    def ndim(self):
+        if not self.spaces:
+            raise ValueError("Empty Space has dimension")
+        return self.spaces[0].ndim
+
 class Block(StencilCompilerNode):
     _fields = ['body']
     # def __init__(self, body):
@@ -108,6 +114,10 @@ class Space(StencilCompilerNode):
     _fields = ['low', 'high', 'stride']
 
     __deepcopy__ = StencilCompilerNode._default_deepcopy
+
+    @property
+    def ndim(self):
+        return len(self.low)
 
 
 class NestedSpace(StencilCompilerNode):
