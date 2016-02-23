@@ -303,7 +303,7 @@ class CCompiler(Compiler):
 
     class LazySpecializedKernel(Compiler.SpecializationKernel):
         def __init__(self, py_ast=None, names=None, target_names=('out',), index_name='index',
-                     _hash=None):
+                     _hash=None, original=None):
             self.__hash = _hash if _hash is not None else hash(py_ast)
             self.names = names
             self.target_names = target_names
@@ -311,6 +311,7 @@ class CCompiler(Compiler):
 
             super(CCompiler.LazySpecializedKernel, self).__init__(py_ast, 'snowflake_' + hex(hash(self)))
             self.parent_cls = CCompiler
+            self.original = original
 
         def config_to_dirname(self, program_config):
             """
@@ -404,5 +405,6 @@ class CCompiler(Compiler):
             names=find_names(original),
             index_name=index_name,
             target_names=[stencil.primary_mesh for stencil in original.body if hasattr(stencil, "primary_mesh")],
-            _hash=hash(original)
+            _hash=hash(original),
+            original=original
         )

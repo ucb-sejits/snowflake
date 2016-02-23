@@ -3,12 +3,14 @@ from __future__ import print_function
 import ast
 from collections import defaultdict
 import itertools
+from math import ceil, floor
 
 from snowflake.nodes import StencilComponent, RectangularDomain, DomainUnion
 
 import numpy as np
 import sympy
 from sympy.solvers import diophantine as dio
+from sympy.solvers import inequalities as ineq
 from snowflake.vector import Vector
 
 __author__ = 'nzhang-dev'
@@ -27,11 +29,7 @@ def get_shadow(stencil):
 
 def analyze_dependencies(vec, space1, space2):
     x, y = sympy.symbols("x y", integer=True)  # used for setting up diophantine equations
-    # s1x + o1 + v = s2y + o2
-    # return [
-    #     dio.diophantine(s1 * x + o1 + v_comp - s2 * y - o2) for s1, o1, v_comp, s2, o2 in
-    #     zip(space1.stride, space1.lower, vec, space2.stride, space2.lower)
-    # ]
+    # TODO: Make it work on superficially colliding domains (but in reality spatially separated)
 
     results = []
     for dim, (s1, o1, v_comp, s2, o2) in enumerate(zip(space1.stride, space1.lower, vec, space2.stride, space2.lower)):
@@ -41,6 +39,7 @@ def analyze_dependencies(vec, space1, space2):
             dio.diophantine(s1 * x + o1 + v_comp - s2 * y - o2)
         )
     return results
+
 
 def validate_stencil(stencil, _verbose=False):
     shadow = get_shadow(stencil)
@@ -63,8 +62,156 @@ def validate_stencil(stencil, _verbose=False):
                 print("Analyzing {} over spaces {}\t{}".format(vector, space1, space2))
             analysis = analyze_dependencies(vector, space1, space2)
             if all(analysis):
+                if _verbose:
+                    print("FAILED")
                 return False
     return True
+
+def _contains_integer(interval):
+    if interval is sympy.EmptySet():
+        return False
+    if interval.is_left_unbounded or interval.is_right_unbounded:
+        return True  # trivially true
+    lower = interval.left if not interval.left_open else int(floor(interval.left + 1))
+    upper = interval.right if not interval.right_open else int(ceil(interval.right - 1))
+    return (upper - lower) >= 0
+
+def _has_conflict(rd1, rd2, offset):
+    """
+    :param rd1: rectangular domain from Stencil1 (1D) <- (low, high, stride) (written domain)
+    :param rd2: rectangular domain from Stencil2 (1D) <- (low, high, stride) (read domain)
+    :param offset_vector: Offset from the center (relative to rd2), 1D projections
+    :return: Whether OV from rectangular domain 2 reads from rectangular domain 1
+    """
+
+    n1 = sympy.Symbol('n1')
+    n2 = sympy.Symbol('n2')
+
+    # Diophantine equations:
+    # offset(iterationspace1) + n1 * stride(iteration_space1) <- write vectors
+    diophantine_eq1 = rd1[0] + n1 * rd1[2]
+    # offset(iterationspace2) + n2 * stride(iteration_space2) + offset_vector  <- Read vectors
+    diophantine_eq2 = rd2[0] + n2 * rd2[2] + offset
+
+    # Since sympy solves eq = 0, we want dio_eq1 - dio_eq2 = 0.
+    eqn = diophantine_eq1 - diophantine_eq2
+    solutions = dio.diophantine(eqn) # default parameter is "t"
+    parameter = sympy.Symbol("t", integer=True)
+    for (parametric_n1, parametric_n2) in solutions:
+        # Solutions is a set of tuples, each containing either a number or parametric expression
+        # which give conditions on satisfiability.
+
+        # are these satisfiable on the original bounds?
+        # substitute the parametric forms in
+        substituted_1 = diophantine_eq1.subs({n1: parametric_n1})
+        substituted_2 = rd2[0] + parametric_n2 * rd2[2]  # we ditch the offset because it's irrelevant since the bounds are based on the center of the stencil
+
+        #now do they satisfy the bounds?
+
+        satisfactory_interval = ineq.reduce_rational_inequalities(
+            [[
+                rd1[0] <= substituted_1,
+                rd1[1] > substituted_1,
+                rd2[0] <= substituted_2,
+                rd2[1] > substituted_2
+            ]],
+            parameter,
+            relational=False
+        )
+
+        if _contains_integer(satisfactory_interval):
+            return True
+    return False
+
+
+def stencil_conflict(stencil1, stencil2, shape_map):
+    """
+    :param stencil1: First stencil to be run
+    :param stencil2: Second stencil to be run
+    :param shape_map: Map of meshname : shape
+    :return: whether stencil2 has a read where stencil1 writes to.
+    """
+
+    shadows = get_shadow(stencil2)  # these are all of the offset vectors for each array
+    if stencil1.output not in shadows:
+        return False  # not read/writing from same mesh
+
+    shade = shadows[stencil1.output] # these are vectors that are used.
+
+    shape = shape_map[stencil1.primary_mesh]
+
+    if stencil1.output == stencil2.output: # if they write to the same array
+        shade |= {Vector.zero_vector(len(shape))}
+
+
+
+    # Perform exhaustive search over pairs of iteration spaces?
+
+    # TODO: Probably should make this smarter
+
+    for write_domain in stencil1.iteration_space.reify(shape).domains:
+        for read_domain in stencil2.iteration_space.reify(shape).domains:
+            # in order to save time, compute the projections for each vector onto each dimension.
+            collisions = [{} for _ in shape]
+            for vector in shade:
+                for dim, val in enumerate(vector):
+                    collisions[dim][val] = False
+
+
+            # using 1d slices of each domain
+            for wd_1d, rd_1d, offsets in zip(
+                zip(write_domain.lower, write_domain.upper, write_domain.stride),
+                zip(read_domain.lower, read_domain.upper, read_domain.stride),
+                collisions
+            ):
+                for offset in offsets:
+                    offsets[offset] = _has_conflict(wd_1d, rd_1d, offset)
+
+            for vector in shade:
+                if all(collisions[dim][val] for dim, val in enumerate(vector)): # some vector has a collision on all dimensions
+                    return True
+    return False
+
+def create_dependency_graph(stencil_group, shape_map):
+    """
+    returns a graph such that G[a][b] is True iff a depends on b.
+    """
+    graph = defaultdict(dict)
+
+    for a, b in itertools.product(stencil_group.body, repeat=2):
+        graph[hash(a)][hash(b)] = None
+
+    print(len(graph))
+    for a, b in itertools.product(stencil_group.body, repeat=2):
+        if a not in graph or b not in graph[a]:
+            graph[hash(a)][hash(b)] = stencil_conflict(b, a, shape_map)
+
+    return graph
+
+
+def create_independent_groups(stencil_group, shape_map):
+    """
+    :param stencil_group: a given stencil group
+    :return: a list of groups that can be run in parallel (i.e. things within a group don't interfere)
+    """
+    groups = []
+    current_group = []
+    graph = create_dependency_graph(stencil_group, shape_map)
+    for index, stencil in enumerate(stencil_group.body):
+        for other_index, other_stencil in current_group:
+            if graph[index][other_index]:
+                # if we have a conflict with a stencil already within the group
+                groups.append(current_group)
+                current_group = []
+                break
+        current_group.append((index, stencil))
+    if current_group:
+        groups.append(current_group)
+    return [
+        [stencil for index, stencil in group]
+        for group in groups
+    ]
+
 
 
 def _getdata(a):

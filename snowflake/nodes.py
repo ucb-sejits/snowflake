@@ -22,8 +22,10 @@ class Stencil(StencilNode):
         # iteration_space is an iterable of (low, high, stride), (low, high), or (high,) tuples
         self.op_tree = op_tree
         self.output = output
-        if not isinstance(iteration_space, StencilNode):
+        if not isinstance(iteration_space, (RectangularDomain, DomainUnion)):
             iteration_space = RectangularDomain(iteration_space)
+        if isinstance(iteration_space, RectangularDomain):
+            iteration_space = DomainUnion([iteration_space])
         self.iteration_space = iteration_space
         self.primary_mesh = primary_mesh or output
 
@@ -62,12 +64,17 @@ class DomainUnion(StencilNode):
     def __str__(self):
         return " U ".join(str(i) for i in self.domains)
 
+    def reify(self, shape):
+        return DomainUnion([domain.reify(shape) for domain in self.domains])
+
 class RectangularDomain(StencilNode):
     def __init__(self, space):
         lower, upper, stride = zip(*space)
         self.lower = Vector(lower)
         self.stride = Vector(stride)
         self.upper = Vector(upper)
+        if not len(self.lower) == len(self.upper) == len(self.stride):
+            raise ValueError("Inconsistent dimensionality in domain")
 
     def __add__(self, other):
         if not isinstance(other, RectangularDomain):
@@ -84,6 +91,26 @@ class RectangularDomain(StencilNode):
 
     def __str__(self):
         return "<{}, {}, {}>".format(self.lower, self.upper, self.stride)
+
+    def reify(self, shape):
+        if len(self.stride) != len(shape):
+            raise ValueError("Shape does not has same number of dimensions as domain")
+        low = Vector(
+            [i + size if i < 0 else i for i, size in zip(self.lower, shape)]
+        )
+
+        high = Vector(
+            [i + size if i <= 0 else i for i, size in zip(self.upper, shape)]
+        )
+
+        # now we clip the high to fit perfectly. For example, 1 to 10 by 3 should really be just 1, 4, 7 (so 1 to 8)
+        # so really the upper bound should be upper - ((upper - lower - 1) % stride)
+        high = Vector(
+            [h - ((h - l) % s) for h, l, s in zip(high, low, self.stride)]
+        )
+
+        # since Rectangular domain expects (low, high, stride) tuples in each dimension, we reform the array
+        return RectangularDomain([(l, h, s) for l, h, s in zip(low, high, self.stride)])
 
 class StencilComponent(StencilNode):
     """

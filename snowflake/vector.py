@@ -12,6 +12,7 @@ __author__ = 'nzhang-dev'
 class Vector(tuple):
     """
     A Vector that supports arithmetic. These can be used for numpy indicies and has neighborhood utility functions.
+    Note that dimensions are 0 indexed
     """
 
     @classmethod
@@ -34,7 +35,7 @@ class Vector(tuple):
         :param ndim: Number of dimensions
         :param radius: Von Neumann Neighborhood radius
         :param closed: Should the neighborhood include all points r < radius or only r = radius
-        :return: Iterator of vectors in the Von Neumann neighborhood, :math:`\{v | v \in Z^n, ||v||_\infty = r\}`
+        :return: Iterator of vectors in the Von Neumann neighborhood, :math:`\{v | v \in Z^n, ||v||_1 = r\}`
         """
         neighborhood = (cls(i) for i in partition(radius, ndim))
         if closed and radius > 1:
@@ -47,7 +48,7 @@ class Vector(tuple):
         :param ndim: Number of dimensions
         :param radius: Moore Neighborhood radius
         :param closed: Should the neighborhood include all points r < radius or only r = radius
-        :return: Iterator of vectors in the Moore neighborhood, :math:`\{v | v \in Z^n, ||v||_1 = r\}`
+        :return: Iterator of vectors in the Moore neighborhood, :math:`\{v | v \in Z^n, ||v||_\infty = r\}`
         """
         neighborhood = (cls(i) for i in shell(radius, ndim))
         if closed and radius > 1:

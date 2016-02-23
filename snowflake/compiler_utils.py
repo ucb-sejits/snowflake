@@ -158,6 +158,7 @@ def create_block_combiner():
                     output.append(child)
             setattr(node, attr, output)
             return node
+        return visit_method
 
     return type(
         "BlockCombineTransformer", (ast.NodeTransformer,), {
