@@ -1,8 +1,10 @@
 from __future__ import division
 import ast
+import atexit
 from collections import OrderedDict
 import copy
 import ctypes
+import functools
 import os
 import re
 import ctree
@@ -14,6 +16,7 @@ from ctree.nodes import Project
 from ctree.transformations import PyBasicConversions
 from ctree.transforms import DeclarationFiller
 from ctree.types import get_ctype
+import time
 from _compiler import StencilCompiler, find_names, ArrayOpRecognizer, OpSimplifier
 from nodes import StencilGroup
 
@@ -55,9 +58,10 @@ class Compiler(object):
         v.visit(node)
         return v.ndim
 
-    def __init__(self, optimizations=()):
+    def __init__(self, optimizations=(), record_time=False):
         self.index_name = "index"
         self.optimizations = OptimizationList(optimizations)
+        self.record_time = record_time
 
     def _compile(self, node, index_name, **kwargs):
         ndim = self.get_ndim(node)
@@ -83,9 +87,28 @@ class Compiler(object):
         if not isinstance(node, StencilGroup):
             node = StencilGroup([node])
         original = copy.deepcopy(node)
+        h = hash(original)
         copied = copy.deepcopy(node)
         compiled = self._compile(original, self.index_name, **kwargs)
         processed = self._post_process(copied, compiled, self.index_name, **kwargs)
+        call_method = processed.__call__
+        if self.record_time:
+            times = []
+            func_name = kwargs.get("name", h)
+            @functools.wraps(call_method)
+            def timed_call(*args):
+                t = time.time()
+                res = call_method(*args)
+                end = time.time()
+                times.append(end-t)
+                return res
+
+            atexit.register
+            def print_result():
+                if times:
+                    print(func_name, len(times), sum(times)/len(times))
+
+            processed.__call__ = timed_call
         return processed
 
     class SpecializationKernel(LazySpecializedFunction):

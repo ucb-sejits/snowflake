@@ -1,8 +1,8 @@
 from __future__ import print_function
 import itertools
-from snowflake.analytics import stencil_conflict, validate_stencil
+from snowflake.analytics import stencil_conflict, validate_stencil, create_dependency_graph, create_parallel_graph
 
-from snowflake.nodes import Stencil, StencilComponent, SparseWeightArray, DomainUnion, RectangularDomain
+from snowflake.nodes import Stencil, StencilComponent, SparseWeightArray, DomainUnion, RectangularDomain, StencilGroup
 from snowflake.vector import Vector
 
 __author__ = 'nzhang-dev'
@@ -119,10 +119,23 @@ def test_boundaries():
         (boundary, get_stencil(boundary)) for boundary in Vector.moore_vectors(dimensions)
     ]
 
+    group = StencilGroup([stencil for bound, stencil in stencils])
+
+    serial = create_dependency_graph(group, {"mesh": (32,)*dimensions})
+    parallel = create_parallel_graph(group, {"mesh": (32,)*dimensions})
+    # print(serial)
+    # print(parallel)
+    # print(serial == parallel)
+    # exit()
+
     for (b1, s1), (b2, s2) in itertools.product(stencils, repeat=2):
         has_conflict = b2+reference_vector(b2) == b1 or b1 == b2
+        graph_conflict = serial[hash(s2)][hash(s1)]
+        parallel_conflict = parallel[hash(s2)][hash(s1)]
         reported = stencil_conflict(s1, s2, shape_map={"mesh": (32,)*dimensions})
-        print(b1, b2, reported, has_conflict, "*" * 5 * (has_conflict != reported))
+        print(b1, b2, reported, has_conflict, graph_conflict, parallel_conflict, '*'*10*(parallel_conflict != has_conflict))
+
+
 
 if __name__ == "__main__":
     # test_collision()

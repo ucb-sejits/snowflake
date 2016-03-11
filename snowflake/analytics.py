@@ -1,9 +1,12 @@
 from __future__ import print_function
 
 import ast
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 import itertools
 from math import ceil, floor
+from multiprocessing import cpu_count, Pool
+import pickle
+import multiprocess
 
 from snowflake.nodes import StencilComponent, RectangularDomain, DomainUnion
 
@@ -67,6 +70,21 @@ def validate_stencil(stencil, _verbose=False):
                 return False
     return True
 
+StencilData = namedtuple("StencilData", ["iteration_space", "shadow", "output", "primary_mesh"])
+ThinDomainUnion = namedtuple("ThinDomainUnion", ["domains"])
+ThinRD = namedtuple("ThinRD", ["lower", "upper", "stride"])
+
+def get_data(stencil):
+    return StencilData(
+        # ThinDomainUnion(
+        #     [ThinRD(space.lower, space.upper, space.stride) for space in stencil.iteration_space.domains]
+        # ),
+        stencil.iteration_space,
+        get_shadow(stencil),
+        stencil.output,
+        stencil.primary_mesh
+    )
+
 def _contains_integer(interval):
     if interval is sympy.EmptySet():
         return False
@@ -92,12 +110,22 @@ def _has_conflict(rd1, rd2, offset):
     diophantine_eq1 = rd1[0] + n1 * rd1[2]
     # offset(iterationspace2) + n2 * stride(iteration_space2) + offset_vector  <- Read vectors
     diophantine_eq2 = rd2[0] + n2 * rd2[2] + offset
-
     # Since sympy solves eq = 0, we want dio_eq1 - dio_eq2 = 0.
     eqn = diophantine_eq1 - diophantine_eq2
-    solutions = dio.diophantine(eqn) # default parameter is "t"
     parameter = sympy.Symbol("t", integer=True)
-    for (parametric_n1, parametric_n2) in solutions:
+    if not eqn.free_symbols:
+        return eqn == 0
+    solutions = dio.diophantine(eqn, parameter) # default parameter is "t"
+    for sol in solutions:
+        if len(eqn.free_symbols) != 2:
+            if n1 in eqn.free_symbols:
+                parametric_n1 = sol[0]
+                parametric_n2 = 0
+            else:
+                parametric_n1 = 0
+                parametric_n2 = sol[0]
+        else:
+            (parametric_n1, parametric_n2) = sol
         # Solutions is a set of tuples, each containing either a number or parametric expression
         # which give conditions on satisfiability.
 
@@ -124,6 +152,7 @@ def _has_conflict(rd1, rd2, offset):
     return False
 
 
+
 def stencil_conflict(stencil1, stencil2, shape_map):
     """
     :param stencil1: First stencil to be run
@@ -132,15 +161,20 @@ def stencil_conflict(stencil1, stencil2, shape_map):
     :return: whether stencil2 has a read where stencil1 writes to.
     """
 
-    shadows = get_shadow(stencil2)  # these are all of the offset vectors for each array
-    if stencil1.output not in shadows:
+    return _stencil_conflict(get_data(stencil1), get_data(stencil2), shape_map)
+
+def _stencil_conflict(data1, data2, shape_map):
+
+    # shadows = get_shadow(stencil2)  # these are all of the offset vectors for each array
+    shadows = data2.shadow
+    if data1.output not in shadows:
         return False  # not read/writing from same mesh
 
-    shade = shadows[stencil1.output] # these are vectors that are used.
+    shade = shadows[data1.output] # these are vectors that are used.
 
-    shape = shape_map[stencil1.primary_mesh]
+    shape = shape_map[data1.primary_mesh]
 
-    if stencil1.output == stencil2.output: # if they write to the same array
+    if data1.output == data2.output: # if they write to the same array
         shade |= {Vector.zero_vector(len(shape))}
 
 
@@ -148,15 +182,13 @@ def stencil_conflict(stencil1, stencil2, shape_map):
     # Perform exhaustive search over pairs of iteration spaces?
 
     # TODO: Probably should make this smarter
-
-    for write_domain in stencil1.iteration_space.reify(shape).domains:
-        for read_domain in stencil2.iteration_space.reify(shape).domains:
+    for write_domain in data1.iteration_space.reify(shape).domains:
+        for read_domain in data2.iteration_space.reify(shape).domains:
             # in order to save time, compute the projections for each vector onto each dimension.
             collisions = [{} for _ in shape]
             for vector in shade:
                 for dim, val in enumerate(vector):
                     collisions[dim][val] = False
-
 
             # using 1d slices of each domain
             for wd_1d, rd_1d, offsets in zip(
@@ -166,25 +198,55 @@ def stencil_conflict(stencil1, stencil2, shape_map):
             ):
                 for offset in offsets:
                     offsets[offset] = _has_conflict(wd_1d, rd_1d, offset)
-
             for vector in shade:
                 if all(collisions[dim][val] for dim, val in enumerate(vector)): # some vector has a collision on all dimensions
                     return True
     return False
+
+
 
 def create_dependency_graph(stencil_group, shape_map):
     """
     returns a graph such that G[a][b] is True iff a depends on b.
     """
     graph = defaultdict(dict)
-
+    minimal_stencil_list = []
     for a, b in itertools.product(stencil_group.body, repeat=2):
+        if hash(a) not in graph:
+            minimal_stencil_list.append(a)  # haven't seen this before
         graph[hash(a)][hash(b)] = None
 
-    print(len(graph))
+    for a, b in itertools.product(minimal_stencil_list, repeat=2):
+        graph[hash(a)][hash(b)] = stencil_conflict(b, a, shape_map)
+
+    return graph
+
+
+def conflict_wrapper((hash_a, hash_b, data_a, data_b, m)):
+    #       b          a        s1, s2, map
+    result = hash_b, hash_a, _stencil_conflict(data_b, data_a, m)
+    return result
+
+def create_parallel_graph(stencil_group, shape_map, num_threads=cpu_count()):
+    """
+    returns a graph such that G[a][b] is True iff a depends on b.
+    """
+
+    pool = Pool(1)
+
+    graph = defaultdict(dict)
+    minimal_stencil_list = []
     for a, b in itertools.product(stencil_group.body, repeat=2):
-        if a not in graph or b not in graph[a]:
-            graph[hash(a)][hash(b)] = stencil_conflict(b, a, shape_map)
+        if hash(a) not in graph:
+            minimal_stencil_list.append(a)  # haven't seen this before
+        graph[hash(a)][hash(b)] = None
+    args = [(hash(b), hash(a), get_data(a), get_data(b), shape_map)
+                                      for a, b in itertools.product(minimal_stencil_list, repeat=2)]
+    results = pool.map(conflict_wrapper, args)
+    for b, a, result in results:
+        graph[a][b] = result
+    # for a, b in itertools.product(minimal_stencil_list, repeat=2):
+    #     graph[hash(a)][hash(b)] = stencil_conflict(b, a, shape_map)
 
     return graph
 

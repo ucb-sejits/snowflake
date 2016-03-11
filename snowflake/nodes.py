@@ -53,6 +53,9 @@ class DomainUnion(StencilNode):
             return DomainUnion(copy.deepcopy(self.domains) + copy.deepcopy(other.domains))
         return NotImplemented
 
+    def __reduce__(self):
+        return (self.__class__, (self.domains,))
+
     __radd__ = __add__
 
     def __hash__(self):
@@ -75,6 +78,10 @@ class RectangularDomain(StencilNode):
         self.upper = Vector(upper)
         if not len(self.lower) == len(self.upper) == len(self.stride):
             raise ValueError("Inconsistent dimensionality in domain")
+
+    def __reduce__(self):
+        args = tuple((l, h, s) for l, h, s in zip(self.lower, self.stride, self.upper))
+        return (self.__class__, (args,))
 
     def __add__(self, other):
         if not isinstance(other, RectangularDomain):
@@ -106,7 +113,7 @@ class RectangularDomain(StencilNode):
         # now we clip the high to fit perfectly. For example, 1 to 10 by 3 should really be just 1, 4, 7 (so 1 to 8)
         # so really the upper bound should be upper - ((upper - lower - 1) % stride)
         high = Vector(
-            [h - ((h - l) % s) for h, l, s in zip(high, low, self.stride)]
+            [(h - ((h - l) % s)) if s else l for h, l, s in zip(high, low, self.stride)]
         )
 
         # since Rectangular domain expects (low, high, stride) tuples in each dimension, we reform the array
