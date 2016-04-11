@@ -2,9 +2,11 @@ import ast
 import copy
 from ctypes import c_long
 import ctree
-from ctree.c.nodes import For, SymbolRef, Assign, Constant, Lt, AugAssign, AddAssign, Add, MultiNode
+import itertools
+from ctree.c.nodes import For, SymbolRef, Assign, Constant, Lt, AugAssign, AddAssign, Add, MultiNode, Pragma, And
 from snowflake.optimizations import OptimizationLevels
 from snowflake.optimizations.base import Optimization
+from ctree.frontend import dump
 
 __author__ = 'nzhang-dev'
 
@@ -50,9 +52,9 @@ class TilingOptimization(Optimization):
                             "Block size must be a multiple of the stride. Block size: {}, stride: {}".format(
                                 block_size, stride
                             ))
-                    if (high-low) % block_size:
-                        raise ValueError("Block size must divide high-low. Block size: {}, high: {}, low: {}".format(
-                                         block_size, high, low))
+                    # if (high-low) % block_size:
+                    #     raise ValueError("Block size must divide high-low. Block size: {}, high: {}, low: {}".format(
+                    #                      block_size, high, low))
                     index_name = cur_node.init.left.name
 
                     # create new loops
@@ -62,8 +64,18 @@ class TilingOptimization(Optimization):
 
                     cur_node.init.left = SymbolRef(name=index_name+"_inner", sym_type=cur_node.init.left.type)
                     cur_node.init.right = Constant(0)
-                    cur_node.test.left = SymbolRef(name=index_name+"_inner")
-                    cur_node.test.right = Constant(block_size)
+                    # cur_node.test.left = SymbolRef(name=index_name+"_inner")
+                    cur_node.test = And(
+                        Lt(SymbolRef(name=index_name+"_inner"), Constant(block_size)),
+                        Lt(
+                            Add(
+                                SymbolRef(name=index_name+"_inner"),
+                                SymbolRef(name=index_name+"_outer")
+                            ),
+                            Constant(high)
+                        )
+                    )
+                    # cur_node.test.right = Constant(block_size)
                     cur_node.incr.target = SymbolRef(name=index_name+"_inner")
 
                     # create outer loop
