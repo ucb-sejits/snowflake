@@ -17,7 +17,7 @@ class Vector(tuple):
 
     @classmethod
     def index_vector(cls, ndim):
-        return cls((sympy.Symbol('index_{}'.format(i), integer=True) for i in range(ndim)))
+        return cls((sympy.Symbol('index_{}'.format(i)) for i in range(ndim)))
 
     @classmethod
     def unit_vector(cls, dim, ndim):
