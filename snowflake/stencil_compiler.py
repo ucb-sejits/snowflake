@@ -103,7 +103,7 @@ class Compiler(object):
                 times.append(end-t)
                 return res
 
-            atexit.register
+            @atexit.register
             def print_result():
                 if times:
                     print(func_name, len(times), sum(times)/len(times))
@@ -257,6 +257,7 @@ class CCompiler(Compiler):
     def __init__(self):
         super(CCompiler, self).__init__()
         self._lsk = None
+        self.tile_size = (16, 16)
 
     class BlockConverter(ast.NodeTransformer):
         def visit_Block(self, node):
@@ -344,9 +345,10 @@ class CCompiler(Compiler):
 
             path_parts = [
                 'snowflake',
+                str(self._hash(self.original_tree)),
                 str(self._hash(program_config.args_subconfig)),
                 str(self._hash(program_config.tuner_subconfig)),
-                str(self.parent_cls.__name__)
+                str(self.parent_cls.__name__),
                 ]
             path_parts = [re.sub(regex_filter, '_', part) for part in path_parts]
             compile_path = str(ctree.CONFIG.get('jit', 'COMPILE_PATH'))
@@ -399,7 +401,7 @@ class CCompiler(Compiler):
                 ],
                 defn=components
             )
-            TilingOptimization().optimize(c_func, (16, 16))
+            TilingOptimization().optimize(c_func, self.tile_size)
             includes = [
                 CppInclude("stdint.h")
             ]
@@ -423,7 +425,7 @@ class CCompiler(Compiler):
             )
 
     def _post_process(self, original, compiled, index_name, **kwargs):
-        return self.LazySpecializedKernel(
+        kern = self.LazySpecializedKernel(
             py_ast=compiled,
             names=find_names(original),
             index_name=index_name,
@@ -431,3 +433,5 @@ class CCompiler(Compiler):
             _hash=hash(original),
             original=original
         )
+        kern.tile_size = self.tile_size
+        return kern

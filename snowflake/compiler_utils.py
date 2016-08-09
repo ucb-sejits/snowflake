@@ -11,7 +11,7 @@ import functools
 import numpy as np
 import sympy
 from snowflake.compiler_nodes import IndexOp, Space, NDSpace
-from snowflake.nodes import SparseWeightArray
+from snowflake.nodes import SparseWeightArray, StencilOp
 from snowflake.vector import Vector
 
 __author__ = 'nzhang-dev'
@@ -36,6 +36,8 @@ def generate_encode_macro(name, shape):
     return CppDefine(name=name, params=params, body=total)
 
 def sympy_to_ast(exp):
+    return ast.parse(str(exp)).body[0].value
+
     if isinstance(exp, sympy.Symbol):
         return ast.Name(id=exp.name, ctx=ast.Load())
 
@@ -122,6 +124,7 @@ def is_homogenous_space(ndspace):
         for low, high in ((low_low, low_high), (high_low, high_high))
     )
 
+
 class StencilShifter(ast.NodeTransformer):
     def __init__(self, offset):
         self.offset = offset
@@ -168,3 +171,22 @@ def create_block_combiner():
 
 BlockCombineTransformer = create_block_combiner()
 del create_block_combiner
+
+def split_stencil(stencil, n):
+    """
+    Currently only works on direct summing stencils
+    :return:
+    """
+    component = stencil.op_tree
+    parts = []
+    should_exit = False
+    while not should_exit:
+        parts.append([])
+        for _ in range(n):
+            if not isinstance(component, StencilOp) or component.op is not operator.add:
+                should_exit = True
+                break
+            parts[-1].append(component.left)
+            component = component.right
+    return parts
+

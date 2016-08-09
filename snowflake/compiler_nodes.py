@@ -4,6 +4,7 @@ import copy
 __author__ = 'nzhang-dev'
 
 import ast
+from vector import Vector
 
 class StencilCompilerNode(ast.AST):
     """
@@ -118,6 +119,7 @@ class Space(StencilCompilerNode):
     @property
     def ndim(self):
         return len(self.low)
+
 
 
 class NestedSpace(StencilCompilerNode):

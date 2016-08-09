@@ -113,9 +113,11 @@ def _has_conflict(rd1, rd2, offset):
     # Since sympy solves eq = 0, we want dio_eq1 - dio_eq2 = 0.
     eqn = diophantine_eq1 - diophantine_eq2
     parameter = sympy.Symbol("t", integer=True)
+    sat_param = sympy.Symbol("t_0", integer=True)
     if not eqn.free_symbols:
         return eqn == 0
     solutions = dio.diophantine(eqn, parameter) # default parameter is "t"
+    #print("Sols:", solutions)
     for sol in solutions:
         if len(eqn.free_symbols) != 2:
             if n1 in eqn.free_symbols:
@@ -134,8 +136,10 @@ def _has_conflict(rd1, rd2, offset):
         substituted_1 = diophantine_eq1.subs({n1: parametric_n1})
         substituted_2 = rd2[0] + parametric_n2 * rd2[2]  # we ditch the offset because it's irrelevant since the bounds are based on the center of the stencil
 
-        #now do they satisfy the bounds?
 
+        #print(substituted_1, "\t", substituted_2)
+        #print(rd1[0], rd1[1], rd2[0], rd2[1])
+        #now do they satisfy the bounds?
         satisfactory_interval = ineq.reduce_rational_inequalities(
             [[
                 rd1[0] <= substituted_1,
@@ -143,9 +147,10 @@ def _has_conflict(rd1, rd2, offset):
                 rd2[0] <= substituted_2,
                 rd2[1] > substituted_2
             ]],
-            parameter,
+            sat_param,
             relational=False
         )
+        #print(satisfactory_interval)
 
         if _contains_integer(satisfactory_interval):
             return True
@@ -198,6 +203,7 @@ def _stencil_conflict(data1, data2, shape_map):
             ):
                 for offset in offsets:
                     offsets[offset] = _has_conflict(wd_1d, rd_1d, offset)
+            #print(collisions)
             for vector in shade:
                 if all(collisions[dim][val] for dim, val in enumerate(vector)): # some vector has a collision on all dimensions
                     return True
@@ -218,7 +224,7 @@ def create_dependency_graph(stencil_group, shape_map):
 
     for a, b in itertools.product(minimal_stencil_list, repeat=2):
         graph[hash(a)][hash(b)] = stencil_conflict(b, a, shape_map)
-
+    #print(graph)
     return graph
 
 

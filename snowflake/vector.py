@@ -17,7 +17,7 @@ class Vector(tuple):
 
     @classmethod
     def index_vector(cls, ndim):
-        return cls((sympy.Symbol('index_{}'.format(i)) for i in range(ndim)))
+        return cls((sympy.Symbol('index_{}'.format(i), integer=True) for i in range(ndim)))
 
     @classmethod
     def unit_vector(cls, dim, ndim):
@@ -56,7 +56,7 @@ class Vector(tuple):
         return neighborhood
 
     @classmethod
-    def __apply(cls, a, b, op):
+    def apply(cls, a, b, op):
         if isinstance(b, Number):
             b = (b,) * len(a)
         elif isinstance(a, Number):
@@ -64,32 +64,32 @@ class Vector(tuple):
         return cls(op(i, j) for i, j in izip_longest(a, b, fillvalue=0))
 
     def __add__(self, other):
-        return Vector.__apply(self, other, operator.add)
+        return Vector.apply(self, other, operator.add)
 
     __radd__ = __add__
 
     def __sub__(self, other):
-        return Vector.__apply(self, other, operator.sub)
+        return Vector.apply(self, other, operator.sub)
 
     def __rsub__(self, other):
         return Vector.apply(other, self, operator.sub)
 
     def __mul__(self, other):
-        return Vector.__apply(self, other, operator.mul)
+        return Vector.apply(self, other, operator.mul)
 
     __rmul__ = __mul__
 
     def __div__(self, other):
-        return Vector.__apply(self, other, operator.div)
+        return Vector.apply(self, other, operator.div)
 
     def __truediv__(self, other):
-        return Vector.__apply(self, other, operator.truediv)
+        return Vector.apply(self, other, operator.truediv)
 
     def __floordiv__(self, other):
-        return Vector.__apply(self, other, operator.floordiv)
+        return Vector.apply(self, other, operator.floordiv)
 
     def __rdiv__(self, other):
-        return Vector.__apply(other, self, operator.div)
+        return Vector.apply(other, self, operator.div)
 
     def __neg__(self):
         return -1 * self

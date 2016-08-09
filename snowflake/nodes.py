@@ -299,12 +299,12 @@ class SparseWeightArray(StencilNode):
         """
         self.__weight_map = {}
         for coord, value in weight_map.items():
+            self.__ndim = len(coord)
             if not value:
                 continue
             self.__weight_map[Vector(coord)] = value if isinstance(value, StencilNode) else StencilConstant(value)
         #self.__weight_map = weight_map
         self.__key_value_pairs = tuple(self.__weight_map.items())
-        self.__ndim = len(self.__key_value_pairs[0][0])
 
     @property
     def weights(self):
