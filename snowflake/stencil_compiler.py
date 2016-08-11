@@ -328,7 +328,7 @@ class CCompiler(Compiler):
     class LazySpecializedKernel(Compiler.SpecializationKernel):
         def __init__(self, py_ast=None, names=None, target_names=('out',), index_name='index',
                      _hash=None, original=None):
-            self.__hash = _hash if _hash is not None else hash(py_ast)
+            self.__hash = _hash if _hash is not None else hash(ast.dump(py_ast))
             self.names = names
             self.target_names = target_names
             self.index_name = index_name
@@ -345,7 +345,7 @@ class CCompiler(Compiler):
 
             path_parts = [
                 'snowflake',
-                str(self._hash(self.original_tree)),
+                str(hash(ast.dump(self.original_tree))),
                 str(self._hash(program_config.args_subconfig)),
                 str(self._hash(program_config.tuner_subconfig)),
                 str(self.parent_cls.__name__),
