@@ -336,6 +336,7 @@ class CCompiler(Compiler):
             super(CCompiler.LazySpecializedKernel, self).__init__(py_ast, 'snowflake_' + hex(hash(self)))
             self.parent_cls = CCompiler
             self.original = original
+            self.__original_hash = str(hash(ast.dump(self.original_tree)))
 
         def config_to_dirname(self, program_config):
             """
@@ -345,7 +346,7 @@ class CCompiler(Compiler):
 
             path_parts = [
                 'snowflake',
-                str(hash(ast.dump(self.original_tree))),
+                self.__original_hash,
                 str(self._hash(program_config.args_subconfig)),
                 str(self._hash(program_config.tuner_subconfig)),
                 str(self.parent_cls.__name__),
